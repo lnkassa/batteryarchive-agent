@@ -20,6 +20,7 @@ from sqlalchemy import MetaData, Table
 from sqlalchemy import create_engine, select, insert, update, delete, func
 
 # Copyright 2021 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this software.
+metadata_obj = MetaData()
 
 class abstractDataType():
     def template_method(self):
@@ -33,30 +34,29 @@ class abstractDataType():
         self.stats_table = ''
 
     #add cells to the database
-    def add_data(self, df_excel, conn, save, plot, path, slash): ##conflict how to pass all tables
+    def add_data(self, df_md, conn, path, df_cell_ts, slash): ##conflict how to pass all tables
         logging.info('add cells')
 
-        # Process one cell at the time
-        for ind in df_excel.index:
+        # Process one cell at a time
+        for ind in df_md.index:
 
-            cell_id = df_excel['cell_id'][ind]
-            file_id = df_excel['file_id'][ind]
-            file_type = df_excel['file_type'][ind]
-            source = df_excel['source'][ind]
+            cell_id = df_md['cell_id'][ind]
+            file_id = df_md['file_id'][ind]
+            file_type = df_md['file_type'][ind]
+            source = df_md['source'][ind]
 
             logging.info("add file: " + file_id + " cell: " + cell_id)
 
-            df_tmp = df_excel.iloc[ind]
-
+            df_tmp = df_md.iloc[ind]
             print(df_tmp)
 
-            df_cell_md, df_cycle_md = self.populate_cycle_metadata(df_tmp) ##conflict module?
+            df_cell_md, df_cycle_md = self.populate_metadata(df_tmp) ##conflict module?
 
             engine = create_engine(conn)
 
             # check if the cell is already there and report status
 
-            status = self.check_cell_status(cell_id, conn) ##conflict module
+            status = self.get_status(cell_id, conn) ##conflict module
 
             if status=="completed":
                 print("skip cell_id: " + cell_id + '\n') ##conflict module
@@ -70,20 +70,20 @@ class abstractDataType():
 
                 status = 'buffering'
 
-                self.set_cell_status(cell_id, status, conn)##conflict
+                self.set_status(cell_id, status, conn)##conflict
             if status=='buffering':
                 print("buffering cell_id: " + cell_id)
 
                 file_path = path + file_id + slash
 
                 #replacing selector with one function that will differ in each class
-                cycle_index_max = self.setup_buffer(cell_id, source, file_path, engine, conn, file_type)
+                cycle_index_max = self.setup_buffer(cell_id, source, file_path, engine, conn, file_type, df_cell_ts)
 
                 print('start import')
 
                 status = "processing"
 
-                self.set_cell_status(cell_id, status, conn)
+                self.set_status(cell_id, status, conn)
 
             if status == 'processing':
 
@@ -133,7 +133,7 @@ class abstractDataType():
 
                 status='completed'
 
-                self.set_cell_status(cell_id, status, conn)
+                self.set_status(cell_id, status, conn)
 
                 self.clear_buffer(cell_id, conn)
 
@@ -276,7 +276,7 @@ class abstractDataType():
         df_tt = df_t[df_t['cycle_index'] > 0]
         return df_cc, df_tt
     
-    def setup_buffer(self, cell_id, source, file_path, engine, conn, file_type): ##conflict need to pass file_type
+    def setup_buffer(self, cell_id, source, file_path, engine, conn, file_type, df_cell_ts, mod_flag): ##conflict need to pass file_type
         logging.info('adding files')
         listOfFiles = glob.glob(file_path + '*.'+ file_type +'*') ##rconflict
         for i in range(len(listOfFiles)):
@@ -287,9 +287,8 @@ class abstractDataType():
         df_file.sort_values(by=['filename'], inplace=True)
         if df_file.empty:
             return
-
         df_file['cell_id'] = cell_id
-        df_tmerge = pd.DataFrame()
+        #df_tmerge = pd.DataFrame()
         start_time = time.time()
 
         sheetnames = self.buffered_sheetnames(cell_id, conn)
@@ -297,9 +296,19 @@ class abstractDataType():
         for ind in df_file.index:
             filename = df_file['filename'][ind]
             cellpath = file_path + filename
-            timeseries = ""
             logging.info('buffering file: ' + filename)
-            cycle_index_max = self.buffer(cell_id, source, cellpath, filename, sheetnames, engine, start_time)
+            if mod_flag==True: #if this cell is part of a module, the timeseries df is passed down from the module class
+                 df_time_series_file = df_cell_ts
+            elif os.path.exists(cellpath):
+                if file_type=='csv':
+                    df_time_series_file = pd.read_csv(cellpath)
+                elif file_type=='excel':
+                    try:
+                        df_time_series_file = pd.ExcelFile(cellpath)
+                    except ValueError as e:
+                        print('\nI got a ValueError - reason: ' + str(e))
+                        print('Make sure metadata and data files (and hidden files) are closed. \n')
+            cycle_index_max = self.buffer(cell_id, source, df_time_series_file, filename, sheetnames, engine, start_time,)
 
         return cycle_index_max
     
@@ -366,7 +375,7 @@ class abstractDataType():
 
         return df
         
-    def populate_cycle_metadata(self, df_c_md): ##conflict need to pass cell type from main
+    def populate_metadata(self, df_c_md): ##conflict need to pass cell type from main
         # Build cell metadata
         df_cell_md = pd.DataFrame()
         df_cell_md['cell_id'] = [df_c_md['cell_id']]
@@ -407,24 +416,17 @@ class abstractDataType():
         ##rconfict this could be combined with get_cycle_index_max
         return
     
-    def check_cell_status(self, cell_id, conn):
-        status = 'new'
-        sql_str = "select status from " + self.cell_metadata_table + " where cell_id = '" + cell_id + "'" ##rconflict
-        db_conn = psycopg2.connect(conn)
-        curs = db_conn.cursor()
-        curs.execute(sql_str)
-        db_conn.commit()
-        record = curs.fetchall()
-        if record: 
-            status = record[0][0] ##rconflict, see joseph's code
-        else:
-            status = 'new'
-        curs.close()
-        db_conn.close()
-        print('cell status is: ' + status)
-        return status
+    def get_status(self, cell_id, engine):
+        table = Table(self.cell_metadata_table, metadata_obj, autoload_with=engine)
+        stmt = select(table.c.status).where(table.c.cell_id==cell_id)
+        with engine.connect() as conn:
+            result = conn.execute(stmt).first()
+            if result is not None:
+                return result[0]
+            else:
+                return None
         
-    def set_cell_status(self, cell_id, status, conn):
+    def set_status(self, cell_id, status, conn):
         sql_str = "update " + self.cell_metadata_table + " set status = '" + status + "' where cell_id = '" + cell_id + "'" ##rconflict
         db_conn = psycopg2.connect(conn)
         curs = db_conn.cursor()
@@ -471,61 +473,57 @@ class liCellCsv(abstractDataType):
         self.buffer_table = 'cycle_timeseries_buffer'
         self.stats_table = 'cycle_stats'
 
-    def buffer(self, cell_id, source, cellpath, filename, sheetnames, engine, start_time):
+    def buffer(self, cell_id, source, df_time_series_file, filename, sheetnames, engine, start_time):
         cycle_index_max = 0
-        if os.path.exists(cellpath):
-            df_time_series_file = pd.read_csv(cellpath)
-            # Find the time series sheet in the excel file
+        if source=='ISU-ILCC':
+        #Calculate the Time (s) for the UConn data (only has date time)
+            df_time_series_file['pystamp']=pd.to_datetime(df_time_series_file['Timestamp']) #convert to python date-time format in ns
+            df_time_series_file['inttime']=df_time_series_file['pystamp'].astype(int)
+            df_time_series_file['inttime']=df_time_series_file['inttime'].div(10**9)
+            df_time_series_file['Time [s]']=df_time_series_file['inttime']-df_time_series_file['inttime'].iloc[0]
 
+        df_time_series = pd.DataFrame()
+
+        try:
             if source=='ISU-ILCC':
-            #Calculate the Time (s) for the UConn data (only has date time)
-                df_time_series_file['pystamp']=pd.to_datetime(df_time_series_file['Timestamp']) #convert to python date-time format in ns
-                df_time_series_file['inttime']=df_time_series_file['pystamp'].astype(int)
-                df_time_series_file['inttime']=df_time_series_file['inttime'].div(10**9)
-                df_time_series_file['Time [s]']=df_time_series_file['inttime']-df_time_series_file['inttime'].iloc[0]
+                df_time_series['cycle_index'] = df_time_series_file['Cycle'] 
+                df_time_series['test_time'] = df_time_series_file['Time [s]']
+                df_time_series['i'] = df_time_series_file['Current (A)'] 
+                df_time_series['v'] = df_time_series_file['Voltage (V)']
+                df_time_series['date_time'] = df_time_series_file['Timestamp'] 
+                df_time_series['cell_id'] = cell_id
+                df_time_series['sheetname'] = filename
+            elif source=='TON-KIT':
+                df_time_series['cycle_index'] = df_time_series_file['cycle number']
+                df_time_series['test_time'] = df_time_series_file['time/s']
+                df_time_series['i'] = df_time_series_file['<I>/mA']
+                df_time_series['v'] = df_time_series_file['Ecell/V']
+                df_time_series['cell_id'] = cell_id
+                df_time_series['sheetname'] = filename
+            elif source=='XCEL':
+                df_time_series['cycle_index'] = df_time_series_file['cycle_index']
+                df_time_series['test_time'] = df_time_series_file['test_time']
+                df_time_series['i'] = df_time_series_file['i']
+                df_time_series['v'] = df_time_series_file['v']
+                df_time_series['date_time'] = df_time_series_file['date_time']
+                df_time_series['env_temperature'] = df_time_series_file['env_temperature']
+                df_time_series['cell_id'] = cell_id
+                df_time_series['sheetname'] = filename
+            
+            cycle_index_file_max = df_time_series.cycle_index.max()
 
-            df_time_series = pd.DataFrame()
+            print('saving sheet: with max cycle: ' +str(cycle_index_file_max)) ##weird
 
-            try:
-                if source=='ISU-ILCC':
-                    df_time_series['cycle_index'] = df_time_series_file['Cycle'] 
-                    df_time_series['test_time'] = df_time_series_file['Time [s]']
-                    df_time_series['i'] = df_time_series_file['Current (A)'] 
-                    df_time_series['v'] = df_time_series_file['Voltage (V)']
-                    df_time_series['date_time'] = df_time_series_file['Timestamp'] 
-                    df_time_series['cell_id'] = cell_id
-                    df_time_series['sheetname'] = filename
-                elif source=='TON-KIT':
-                    df_time_series['cycle_index'] = df_time_series_file['cycle number']
-                    df_time_series['test_time'] = df_time_series_file['time/s']
-                    df_time_series['i'] = df_time_series_file['<I>/mA']
-                    df_time_series['v'] = df_time_series_file['Ecell/V']
-                    df_time_series['cell_id'] = cell_id
-                    df_time_series['sheetname'] = filename
-                elif source=='XCEL':
-                    df_time_series['cycle_index'] = df_time_series_file['cycle_index']
-                    df_time_series['test_time'] = df_time_series_file['test_time']
-                    df_time_series['i'] = df_time_series_file['i']
-                    df_time_series['v'] = df_time_series_file['v']
-                    df_time_series['date_time'] = df_time_series_file['date_time']
-                    df_time_series['env_temperature'] = df_time_series_file['env_temperature']
-                    df_time_series['cell_id'] = cell_id
-                    df_time_series['sheetname'] = filename
-                
-                cycle_index_file_max = df_time_series.cycle_index.max()
+            df_time_series.to_sql(self.buffer_table, con=engine, if_exists='append', chunksize=1000, index=False)
 
-                print('saving sheet: with max cycle: ' +str(cycle_index_file_max)) ##weird
+            print("saved=" + filename + " time: " + str(time.time() - start_time))
 
-                df_time_series.to_sql(self.buffer_table, con=engine, if_exists='append', chunksize=1000, index=False)
+            start_time = time.time()
 
-                print("saved=" + filename + " time: " + str(time.time() - start_time))
-
-                start_time = time.time()
-
-            except KeyError as e:
-                print("I got a KeyError - reason: " + str(e))
-                print("processing: time: " + str(time.time() - start_time))##weird
-                start_time = time.time()
+        except KeyError as e:
+            print("I got a KeyError - reason: " + str(e))
+            print("processing: time: " + str(time.time() - start_time))##weird
+            start_time = time.time()
 
         return cycle_index_max
     
@@ -539,62 +537,55 @@ class liCellArbin(abstractDataType):
         self.buffer_table = 'cycle_timeseries_buffer'
         self.stats_table = 'cycle_stats'
 
-    def buffer(self, cell_id, source, cellpath, filename, sheetnames, engine, start_time):
+    def buffer(self, cell_id, df_time_series_file, filename, sheetnames, engine, start_time): ##conflict, make sure parameters match between versions of buffer func
         cycle_index_max = 0
-        if os.path.exists(cellpath):
-            try:
-                df_cell = pd.ExcelFile(cellpath)
-            except ValueError as e:
-                print('\nI got a ValueError - reason: ' + str(e))
-                print('Make sure metadata and data files (and hidden files) are closed. \n')
-            # Find the time series sheet in the excel file
+        # Find the time series sheet in the excel file
+        for k in df_time_series_file.sheet_names:
+            unread_sheet = True
+            sheetname = filename + "|" + k
 
-            for k in df_cell.sheet_names:
-                unread_sheet = True
-                sheetname = filename + "|" + k
+            try:
+                sheetnames.index(sheetname)
+                print("found:" + sheetname)
+                unread_sheet = False
+            except ValueError:
+                print("not found:" + sheetname)
+
+            if "hannel" in k and  k != "Channel_Chart" and unread_sheet:
+                logging.info("file: " + filename + " sheet:" + str(k))
+                timeseries = k
+
+                df_time_series_file = pd.read_excel(df_time_series_file, sheet_name=timeseries)
+
+                df_time_series = pd.DataFrame()
 
                 try:
-                    sheetnames.index(sheetname)
-                    print("found:" + sheetname)
-                    unread_sheet = False
-                except ValueError:
-                    print("not found:" + sheetname)
 
-                if "hannel" in k and  k != "Channel_Chart" and unread_sheet:
-                    logging.info("file: " + filename + " sheet:" + str(k))
-                    timeseries = k
+                    df_time_series['cycle_index'] = df_time_series_file['Cycle_Index']
+                    df_time_series['test_time'] = df_time_series_file['Test_Time(s)']
+                    df_time_series['i'] = df_time_series_file['Current(A)']
+                    df_time_series['v'] = df_time_series_file['Voltage(V)']
+                    df_time_series['date_time'] = df_time_series_file['Date_Time']
+                    df_time_series['cell_id'] = cell_id
+                    df_time_series['sheetname'] = filename + "|" + timeseries
 
-                    df_time_series_file = pd.read_excel(df_cell, sheet_name=timeseries)
+                    cycle_index_file_max = df_time_series.cycle_index.max()
 
-                    df_time_series = pd.DataFrame()
+                    if cycle_index_file_max > cycle_index_max:
+                        cycle_index_max = cycle_index_file_max
 
-                    try:
+                    print('saving sheet: ' + timeseries + ' with max cycle: ' +str(cycle_index_file_max))
 
-                        df_time_series['cycle_index'] = df_time_series_file['Cycle_Index']
-                        df_time_series['test_time'] = df_time_series_file['Test_Time(s)']
-                        df_time_series['i'] = df_time_series_file['Current(A)']
-                        df_time_series['v'] = df_time_series_file['Voltage(V)']
-                        df_time_series['date_time'] = df_time_series_file['Date_Time']
-                        df_time_series['cell_id'] = cell_id
-                        df_time_series['sheetname'] = filename + "|" + timeseries
+                    df_time_series.to_sql('cycle_timeseries_buffer', con=engine, if_exists='append', chunksize=1000, index=False)
 
-                        cycle_index_file_max = df_time_series.cycle_index.max()
+                    print("saved=" + timeseries + " time: " + str(time.time() - start_time))
 
-                        if cycle_index_file_max > cycle_index_max:
-                            cycle_index_max = cycle_index_file_max
+                    start_time = time.time()
 
-                        print('saving sheet: ' + timeseries + ' with max cycle: ' +str(cycle_index_file_max))
-
-                        df_time_series.to_sql('cycle_timeseries_buffer', con=engine, if_exists='append', chunksize=1000, index=False)
-
-                        print("saved=" + timeseries + " time: " + str(time.time() - start_time))
-
-                        start_time = time.time()
-
-                    except KeyError as e:
-                        print("I got a KeyError - reason " + str(e))
-                        print("processing:" + timeseries + " time: " + str(time.time() - start_time))
-                        start_time = time.time()
+                except KeyError as e:
+                    print("I got a KeyError - reason " + str(e))
+                    print("processing:" + timeseries + " time: " + str(time.time() - start_time))
+                    start_time = time.time()
 
         return cycle_index_max
 
@@ -608,9 +599,185 @@ class liModule(abstractDataType):
         self.buffer_table = 'cycle_timeseries_buffer'
         self.stats_table = 'cycle_stats'
 
+    def add_data(self, df_md, conn, save, plot, path, slash): 
+        logging.info('add modules')
+
+        # Process one module at a time
+        for ind in df_md.index:
+
+            row = df_md[ind]
+            module_id = df_md['module_id'][ind]
+            file_id = df_md['file_id'][ind]
+            self.configuration_file=os.path.join(path, f"{file_id}.xlsx")
+            #tester = df_md['tester'][ind]
+            #file_type = df_md['file_type'][ind]
+            #source = df_md['source'][ind]
+
+            logging.info("add file: " + file_id + " module: " + module_id)
+
+            df_md = df_md.iloc[ind]
+            print(df_md)
+
+            df_module_md, df_cell_md = self.populate_metadata(self, df_md, file_id) ##conflict module?
+
+            engine = create_engine(conn)
+
+            # check if the module is already there and report status
+
+            status = self.get_status(module_id, engine) ##rconflict
+
+            if status=="completed":
+                print("skip module: " + module_id + '\n') ##rconflict module
+
+            if status=='new': 
+
+                logging.info('save module metadata') ##conflict module
+                df_module_md.to_sql(self.module_metadata_table, con=engine, if_exists='append', chunksize=1000, index=False)##rconflict
+                #logging.info('save cycle metadata')
+                #df_cycle_md.to_sql(self._metadata_table, con=engine, if_exists='append', chunksize=1000, index=False)##rconflict
+
+                status = 'buffering'
+
+                self.set_status(module_id, status, conn)##rconflict
+
+            if status=='buffering':
+                print("buffering module: " + module_id)
+
+                file_path = path + file_id + slash
+
+                #replacing selector with one function that will differ in each class
+                cycle_index_max = self.setup_buffer(row, file_path, engine, conn)
+
+                print('start import')
+
+                status = "processing"
+
+                self.set_status(module_id, status, conn)
+
+            if status == 'processing':
+
+                # read the data back in chunks.
+                block_size = 30
+
+                cycle_index_max = self.get_cycle_index_max(cell_id, conn, self.buffer_table) ##rconflict
+                cycle_stats_index_max = self.get_cycle_index_max(cell_id, conn, self.stats_table) ##rconflict
+
+                print("max cycle: " + str(cycle_index_max))
+
+                start_cycle = 1
+                start_time = time.time()
+
+                for i in range(cycle_index_max+1):
+                
+                    if (i-1) % block_size == 0 and i > 0 and i>cycle_stats_index_max:
+
+                        start_cycle = i
+                        end_cycle = start_cycle + block_size - 1
+
+                        sql_cell =  " cell_id='" + cell_id + "'" 
+                        sql_cycle = " and cycle_index>=" + str(start_cycle) + " and cycle_index<=" + str(end_cycle)
+                        sql_str = "select * from " + self.buffer_table + " where " + sql_cell + sql_cycle + " order by test_time"##rconflict
+
+                        print(sql_str)
+                        df_ts = pd.read_sql(sql_str, conn)
+
+                        df_ts.drop('sheetname', axis=1, inplace=True)
+
+                        if not df_ts.empty:
+                            start_time = time.time()
+                            df_cycle_stats, df_cycle_timeseries = self.calc_stats(df_ts, cell_id, engine)
+                            print("calc_stats time: " + str(time.time() - start_time))
+                            logging.info("calc_stats time: " + str(time.time() - start_time))
+
+                            start_time = time.time()
+                            df_cycle_stats.to_sql(self.stats_table, con=engine, if_exists='append', chunksize=1000, index=False)##rconflict
+                            print("save stats time: " + str(time.time() - start_time))
+                            logging.info("save stats time: " + str(time.time() - start_time))
+
+                            start_time = time.time()
+                            df_cycle_timeseries.to_sql(self.timeseries_table, con=engine, if_exists='append', chunksize=1000, index=False) ##rconflict
+                            print("save timeseries time: " + str(time.time() - start_time))
+                            logging.info("save timeseries time: " + str(time.time() - start_time))
+
+
+                status='completed'
+
+                self.set_status(cell_id, status, conn)
+
+                self.clear_buffer(cell_id, conn)
+
+    def setup_buffer(self, df_cell_md, md_row, file_path, engine, conn, slash):
+        #file_id=md_row['file_id']
+        for index, row in self.configuration_file.iterrows():
+            tester = md_row['tester']
+            if row['Type'] == 'Module':
+                self.buffer()
+            elif row['Type'] == 'Cell': 
+                if tester=='arbin':
+                    cell = liCellArbin() ##conflict pass parent id
+                    cell.add_data(df_cell_md, conn, file_path, slash) ##confict pass df as single row
+                elif tester=='generic':
+                    cell = liCellCsv() ##conflict pass parent id
+                    cell.add_data(df_cell_md, conn, file_path, slash) ##conflict pass df as single row?
+                
+        
+    
     def buffer(cell_id, source, cellpath, filename, sheetnames, engine, start_time):
 
         return
+    
+    def create_cell_df(path):
+        #creates timeseries dataframe for a single cell from the module data timeseries excel file
+
+        return df_cell_ts
+    
+    def populate_metadata(self, df_m_md, file_id):
+        # Build module metadata
+        df_module_md = pd.DataFrame()
+        df_module_md['module_id'] = [df_m_md['module_id']]
+        df_module_md['configuration'] = [df_m_md['configuration']]
+        df_module_md['num_parallel'] = [df_m_md['cathode']]
+        df_module_md['num_series'] = [df_m_md['source']]
+
+        # create virtual 'cell_list.xlsx' as a dataframe
+        config = self.configuration_file
+        df_cell_md = pd.DataFrame()
+        for index, row in config: #do we need index
+            if row['Type'] == 'Cell': #create cell_id by concat
+                df_cell_md['cell_id'] = df_module_md['module_id'] + '_' + row['Name']
+                df_cell_md['file_id'] = file_id ##conflict files
+        return df_module_md, df_cell_md
+    
+    def get_status(self, module_id, engine):
+        table = Table(self.module_metadata_table, metadata_obj, autoload_with=engine)
+        stmt = select(table.c.status).where(table.c.module_id==module_id)
+        with engine.connect() as conn:
+            result = conn.execute(stmt).first()
+        if result is not None:
+            return result[0]
+        else:
+            return None
+    
+    def set_status(self, module_id, status, conn):
+        sql_str = "update " + self.module_metadata_table + " set status = '" + status + "' where cell_id = '" + module_id + "'" ##rconflict
+        db_conn = psycopg2.connect(conn)
+        curs = db_conn.cursor()
+        curs.execute(sql_str)
+        db_conn.commit()
+        curs.close()
+        db_conn.close()
+        return
+    
+    def clear_buffer(self, module_id, conn):
+        # this method will delete data for a module_id. Use with caution as there is no undo
+        db_conn = psycopg2.connect(conn)
+        curs = db_conn.cursor()
+        curs.execute("delete from " + self.buffer_table + " where cell_id='" + module_id + "'") ##conflict
+        db_conn.commit()
+        curs.close()
+        db_conn.close()
+        return
+        
 def main(argv):
 
     # command line variables that can be used to run from an IDE without passing arguments
@@ -668,16 +835,16 @@ def main(argv):
         slash = r'\\'
 
     if data_type == 'li-cell':
-        df_excel = pd.read_excel(path + "cell_list.xlsx")
-        tester = df_excel['tester'][0]
+        df_md = pd.read_excel(path + "cell_list.xlsx")
+        tester = df_md['tester'][0]
         if tester == 'generic':
             imp = liCellCsv()
         elif tester == 'arbin':
             imp = liCellArbin()
     elif data_type == 'li-module':
-        df_excel = pd.read_excel(path + "module_list.xlsx")
+        df_md = pd.read_excel(path + "module_list.xlsx")
         imp = liModule()
-    imp.add_data(df_excel, conn, save, plot, path, slash)
+    imp.add_data(df_md, conn, save, plot, path, slash)
 
 
 if __name__ == "__main__":
