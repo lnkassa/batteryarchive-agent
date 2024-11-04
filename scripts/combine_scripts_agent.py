@@ -18,6 +18,7 @@ import logging.config
 import time
 from sqlalchemy import MetaData, Table
 from sqlalchemy import create_engine, select, insert, update, delete, func
+from io import BytesIO ##new
 
 # Copyright 2021 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this software.
 metadata_obj = MetaData()
@@ -34,7 +35,9 @@ class abstractDataType():
         self.stats_table = ''
 
     #add cells to the database
-    def add_data(self, df_md, conn, path, df_cell_ts, slash): ##conflict how to pass all tables
+    def add_data(self, df_md, conn, path, slash, mod_flag, **kwargs): ##conflict how to pass all tables
+        #optional args: df_cell_ts
+        df_cell_ts = kwargs[df_cell_ts]
         logging.info('add cells')
 
         # Process one cell at a time
@@ -77,7 +80,7 @@ class abstractDataType():
                 file_path = path + file_id + slash
 
                 #replacing selector with one function that will differ in each class
-                cycle_index_max = self.setup_buffer(cell_id, source, file_path, engine, conn, file_type, df_cell_ts)
+                cycle_index_max = self.setup_buffer(file_path, conn, mod_flag, cell_id=cell_id, file_type=file_type, source=source, df_cell_ts=df_cell_ts)
 
                 print('start import')
 
@@ -276,7 +279,11 @@ class abstractDataType():
         df_tt = df_t[df_t['cycle_index'] > 0]
         return df_cc, df_tt
     
-    def setup_buffer(self, cell_id, source, file_path, engine, conn, file_type, df_cell_ts, mod_flag): ##conflict need to pass file_type
+    def setup_buffer(self, file_path, conn, mod_flag, **kwargs): ##conflict need to pass file_type
+        file_type = kwargs[file_type]
+        cell_id = kwargs[cell_id]
+        df_cell_ts = kwargs[df_cell_ts]
+        #optional args: source, engine
         logging.info('adding files')
         listOfFiles = glob.glob(file_path + '*.'+ file_type +'*') ##rconflict
         for i in range(len(listOfFiles)):
@@ -308,11 +315,11 @@ class abstractDataType():
                     except ValueError as e:
                         print('\nI got a ValueError - reason: ' + str(e))
                         print('Make sure metadata and data files (and hidden files) are closed. \n')
-            cycle_index_max = self.buffer(cell_id, source, df_time_series_file, filename, sheetnames, engine, start_time,)
+            cycle_index_max = self.buffer(cell_id, df_time_series_file, filename, sheetnames, start_time)
 
         return cycle_index_max
     
-    def buffer(self, cell_id, source, cellpath, filename, sheetnames, engine, start_time):
+    def buffer(self, **kwargs):
         pass
     
     def calc_cycle_quantities(self,df):
@@ -491,15 +498,13 @@ class liCellCsv(abstractDataType):
                 df_time_series['i'] = df_time_series_file['Current (A)'] 
                 df_time_series['v'] = df_time_series_file['Voltage (V)']
                 df_time_series['date_time'] = df_time_series_file['Timestamp'] 
-                df_time_series['cell_id'] = cell_id
-                df_time_series['sheetname'] = filename
+ 
             elif source=='TON-KIT':
                 df_time_series['cycle_index'] = df_time_series_file['cycle number']
                 df_time_series['test_time'] = df_time_series_file['time/s']
                 df_time_series['i'] = df_time_series_file['<I>/mA']
                 df_time_series['v'] = df_time_series_file['Ecell/V']
-                df_time_series['cell_id'] = cell_id
-                df_time_series['sheetname'] = filename
+
             elif source=='XCEL':
                 df_time_series['cycle_index'] = df_time_series_file['cycle_index']
                 df_time_series['test_time'] = df_time_series_file['test_time']
@@ -507,9 +512,11 @@ class liCellCsv(abstractDataType):
                 df_time_series['v'] = df_time_series_file['v']
                 df_time_series['date_time'] = df_time_series_file['date_time']
                 df_time_series['env_temperature'] = df_time_series_file['env_temperature']
-                df_time_series['cell_id'] = cell_id
-                df_time_series['sheetname'] = filename
-            
+                
+            df_time_series['cell_id'] = cell_id
+            df_time_series['sheetname'] = filename
+            df_time_series['component_level'] = 'cell'
+
             cycle_index_file_max = df_time_series.cycle_index.max()
 
             print('saving sheet: with max cycle: ' +str(cycle_index_file_max)) ##weird
@@ -546,12 +553,12 @@ class liCellArbin(abstractDataType):
 
             try:
                 sheetnames.index(sheetname)
-                print("found:" + sheetname)
+                print("found:" + sheetname) ##is there a better way to do this??
                 unread_sheet = False
             except ValueError:
                 print("not found:" + sheetname)
 
-            if "hannel" in k and  k != "Channel_Chart" and unread_sheet:
+            if "hannel" in k and  k != "Channel_Chart" and unread_sheet: ##better way to do this??
                 logging.info("file: " + filename + " sheet:" + str(k))
                 timeseries = k
 
@@ -568,6 +575,7 @@ class liCellArbin(abstractDataType):
                     df_time_series['date_time'] = df_time_series_file['Date_Time']
                     df_time_series['cell_id'] = cell_id
                     df_time_series['sheetname'] = filename + "|" + timeseries
+                    df_time_series['component_level'] = 'cell'
 
                     cycle_index_file_max = df_time_series.cycle_index.max()
 
@@ -599,7 +607,7 @@ class liModule(abstractDataType):
         self.buffer_table = 'cycle_timeseries_buffer'
         self.stats_table = 'cycle_stats'
 
-    def add_data(self, df_md, conn, save, plot, path, slash): 
+    def add_data(self, df_md, conn, path, slash, mod_flag, **kwargs): 
         logging.info('add modules')
 
         # Process one module at a time
@@ -618,8 +626,6 @@ class liModule(abstractDataType):
             df_md = df_md.iloc[ind]
             print(df_md)
 
-            df_module_md, df_cell_md = self.populate_metadata(self, df_md, file_id) ##conflict module?
-
             engine = create_engine(conn)
 
             # check if the module is already there and report status
@@ -632,6 +638,7 @@ class liModule(abstractDataType):
             if status=='new': 
 
                 logging.info('save module metadata') ##conflict module
+                df_module_md, df_c_md = self.populate_metadata(self, df_md, file_id) ##conflict module?
                 df_module_md.to_sql(self.module_metadata_table, con=engine, if_exists='append', chunksize=1000, index=False)##rconflict
                 #logging.info('save cycle metadata')
                 #df_cycle_md.to_sql(self._metadata_table, con=engine, if_exists='append', chunksize=1000, index=False)##rconflict
@@ -646,7 +653,7 @@ class liModule(abstractDataType):
                 file_path = path + file_id + slash
 
                 #replacing selector with one function that will differ in each class
-                cycle_index_max = self.setup_buffer(row, file_path, engine, conn)
+                cycle_index_max = self.setup_buffer(file_path, conn, mod_flag=mod_flag, df_cell_md=df_c_md, md_row=row, sl=slash)
 
                 print('start import')
 
@@ -656,11 +663,11 @@ class liModule(abstractDataType):
 
             if status == 'processing':
 
-                # read the data back in chunks.
+                #read the data back in chunks.
                 block_size = 30
 
-                cycle_index_max = self.get_cycle_index_max(cell_id, conn, self.buffer_table) ##rconflict
-                cycle_stats_index_max = self.get_cycle_index_max(cell_id, conn, self.stats_table) ##rconflict
+                cycle_index_max = self.get_cycle_index_max(module_id, conn, self.buffer_table) ##rconflict
+                cycle_stats_index_max = self.get_cycle_index_max(module_id, conn, self.stats_table) ##rconflict
 
                 print("max cycle: " + str(cycle_index_max))
 
@@ -674,9 +681,9 @@ class liModule(abstractDataType):
                         start_cycle = i
                         end_cycle = start_cycle + block_size - 1
 
-                        sql_cell =  " cell_id='" + cell_id + "'" 
+                        sql_module =  " cell_id='" + module_id + "'" 
                         sql_cycle = " and cycle_index>=" + str(start_cycle) + " and cycle_index<=" + str(end_cycle)
-                        sql_str = "select * from " + self.buffer_table + " where " + sql_cell + sql_cycle + " order by test_time"##rconflict
+                        sql_str = "select * from " + self.buffer_table + " where " + sql_module + sql_cycle + " order by test_time"##rconflict
 
                         print(sql_str)
                         df_ts = pd.read_sql(sql_str, conn)
@@ -685,7 +692,7 @@ class liModule(abstractDataType):
 
                         if not df_ts.empty:
                             start_time = time.time()
-                            df_cycle_stats, df_cycle_timeseries = self.calc_stats(df_ts, cell_id, engine)
+                            df_cycle_stats, df_cycle_timeseries = self.calc_stats(df_ts, module_id, engine)
                             print("calc_stats time: " + str(time.time() - start_time))
                             logging.info("calc_stats time: " + str(time.time() - start_time))
 
@@ -702,33 +709,68 @@ class liModule(abstractDataType):
 
                 status='completed'
 
-                self.set_status(cell_id, status, conn)
+                self.set_status(module_id, status, conn)
 
-                self.clear_buffer(cell_id, conn)
+                self.clear_buffer(module_id, conn)
 
-    def setup_buffer(self, df_cell_md, md_row, file_path, engine, conn, slash):
-        #file_id=md_row['file_id']
-        for index, row in self.configuration_file.iterrows():
-            tester = md_row['tester']
-            if row['Type'] == 'Module':
-                self.buffer()
-            elif row['Type'] == 'Cell': 
-                if tester=='arbin':
-                    cell = liCellArbin() ##conflict pass parent id
-                    cell.add_data(df_cell_md, conn, file_path, slash) ##confict pass df as single row
-                elif tester=='generic':
-                    cell = liCellCsv() ##conflict pass parent id
-                    cell.add_data(df_cell_md, conn, file_path, slash) ##conflict pass df as single row?
+    def setup_buffer(self, file_path, conn, mod_flag, **kwargs):
+        df_cell_md = kwargs[df_cell_md]
+        df_cell_ts = kwargs[df_cell_ts]
+        slash = kwargs[sl]
+        md_row = kwargs[md_row]
+        if df_cell_md.empty:
+            print('There is no cell data to add.')
+        else:
+            for index, row in self.configuration_file.iterrows():
+                tester = md_row['tester']
+                if row['Type'] == 'Module':
+                    self.buffer(module_id=md_row['module_id'], df_module_data=)
+                elif row['Type'] == 'Cell': 
+                    df_cell_ts = self.create_cell_df(file_path, row)
+                    if tester=='arbin':
+                        cell = liCellArbin() ##conflict pass parent id
+                        cell.add_data(df_cell_md, conn, file_path, slash, df_cell_ts, mod_flag) ##confict pass df as single row
+                    #elif tester=='generic':
+                        #cell = liCellCsv() ##conflict pass parent id
+                        #cell.add_data(df_cell_md, conn, file_path, slash) ##conflict pass df as single row?
                 
         
     
-    def buffer(cell_id, source, cellpath, filename, sheetnames, engine, start_time):
+    def buffer(self, **kwargs):
+        config = pd.ExcelFile(self.configuration_file)
+        df_module_data = kwargs[df_module_data]
+        module_id = kwargs[module_id]
+        df_m_data = pd.DataFrame
+        for index, row in config:
+            if row["Voltage column"]:
+                df_m_data["v"] = df_module_data[row["Voltage column"]]
+            if row["Current column"]:
+                df_m_data["i"] = df_module_data[row["Current column"]]
+            if row["Internal temperature column"]:
+                df_m_data["cell_temperature"] = df_module_data[row["Internal temperature column"]]
+            if row["Ambient temperature column"]:
+                df_m_data["env_temperature"] = df_module_data[row["Ambient temperature column"]]
+            df_m_data["date_time"] = df_module_data[row["Timestamp column"]]
+            df_m_data["test_time"] = df_module_data[row["Test time column"]]
+            df_m_data["cycle_index"] = df_module_data[row["Cycle index column"]]
+            df_m_data["cell_id"] = module_id ##should we change this in the schema?
+            df_m_data["component_level"] = 'module'
 
-        return
     
-    def create_cell_df(path):
+    def create_cell_df(self, path, row):
         #creates timeseries dataframe for a single cell from the module data timeseries excel file
-
+        data_files = glob.glob(os.path.join(path, f"*.xlsx"))
+        data_files = [file for file in data_files if not self.configuration_file and "~$" not in os.path.basename(file)]
+        df_module_file = pd.ExcelFile(data_files[0])
+        df_cell_ts = pd.DataFrame
+        #Column names
+        df_cell_ts.columns = ['Date_Time', 'Cycle_Index', 'Test_Time(s)', 'Current(A)', 'Voltage(V)']
+        #Timeseries data
+        df_cell_ts['Date_Time'] = df_module_file[row['Timestamp Column']]
+        df_cell_ts['Cycle_Index'] = df_module_file[row['Cycle index column']]
+        df_cell_ts['Test_Time(s)'] = df_module_file[row['Test time column']]
+        df_cell_ts['Current(A)'] = df_module_file[row['Current column']]
+        df_cell_ts['Voltage(V)'] = df_module_file[row['Voltage column']]
         return df_cell_ts
     
     def populate_metadata(self, df_m_md, file_id):
@@ -738,14 +780,18 @@ class liModule(abstractDataType):
         df_module_md['configuration'] = [df_m_md['configuration']]
         df_module_md['num_parallel'] = [df_m_md['cathode']]
         df_module_md['num_series'] = [df_m_md['source']]
-
         # create virtual 'cell_list.xlsx' as a dataframe
-        config = self.configuration_file
+        config = pd.ExcelFile(self.configuration_file)
+        insert_md = pd.DataFrame({'cathode':None,'anode':None,'temperature':None,'soc_max':None,'soc_min':None,'source':None,'crate_c':None,'crate_d':None,'ah':None,'form_factor':None,'tester':None,'test':None,'file_type':None})
+        insert_md = df_module_md[insert_md.columns]
         df_cell_md = pd.DataFrame()
-        for index, row in config: #do we need index
-            if row['Type'] == 'Cell': #create cell_id by concat
-                df_cell_md['cell_id'] = df_module_md['module_id'] + '_' + row['Name']
-                df_cell_md['file_id'] = file_id ##conflict files
+        for index, row in config: 
+            df_cell_md.loc[index] = insert_md
+            if row['Type'] == 'Cell':
+                df_cell_md.loc[index] = insert_md
+                df_cell_md.at[index,'cell_id'] = df_module_md['module_id'] + '_' + row['Name'] #create cell_id by concat
+                df_cell_md.at[index,'file_id'] = file_id
+        print(df_cell_md) #temp for testing
         return df_module_md, df_cell_md
     
     def get_status(self, module_id, engine):
@@ -834,6 +880,7 @@ def main(argv):
     elif style == 'windows':
         slash = r'\\'
 
+    mod_flag=False
     if data_type == 'li-cell':
         df_md = pd.read_excel(path + "cell_list.xlsx")
         tester = df_md['tester'][0]
@@ -844,7 +891,8 @@ def main(argv):
     elif data_type == 'li-module':
         df_md = pd.read_excel(path + "module_list.xlsx")
         imp = liModule()
-    imp.add_data(df_md, conn, save, plot, path, slash)
+        mod_flag=True
+    imp.add_data(df_md, conn, path, slash, mod_flag)
 
 
 if __name__ == "__main__":
