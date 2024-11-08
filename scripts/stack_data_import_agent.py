@@ -472,7 +472,7 @@ def process_cell_timeseries_data(cell_id, engine, component_level="cell"):
                     buffer_table.c.cycle_index <= end_cycle
                 ).order_by(buffer_table.c.test_time)
 
-            print(query)
+            #print(query)
             df_ts = pd.read_sql(query, engine)
 
             df_ts.drop('sheetname', axis=1, inplace=True)
