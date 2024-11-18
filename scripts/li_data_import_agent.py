@@ -570,9 +570,15 @@ def read_save_timeseries_generic(cell_id, source, file_path, engine, conn):
                     df_time_series['cell_id'] = cell_id
                     df_time_series['sheetname'] = filename
                 elif source=='TON-KIT':
+                    #controlV = df_time_series_file['control/V']
+                    #controlmA = df_time_series_file['control/mA']
                     df_time_series['cycle_index'] = df_time_series_file['cycle number']
                     df_time_series['test_time'] = df_time_series_file['time/s']
-                    df_time_series['i'] = df_time_series_file['<I>/mA']
+                    #if controlmA != 0:
+                        #df_time_series['i'] = df_time_series_file['<I>/mA'] / controlmA
+                    #if controlV != 0:
+                        #df_time_series['v'] = df_time_series_file['Ecell/V'] / controlV
+                    df_time_series['i'] = df_time_series_file['<I>/mA'] / 1000
                     df_time_series['v'] = df_time_series_file['Ecell/V']
                     df_time_series['cell_id'] = cell_id
                     df_time_series['sheetname'] = filename

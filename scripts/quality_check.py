@@ -21,20 +21,24 @@ def read_csv_rows(file_path):
     cycle_str = input('Please input the cycles you wish to compare separated by commas (ex: 1,50,100,150,200): ')
     cycles = [int(s) for s in cycle_str.split(',')]
     print('This file has ' + str(len(df)) + ' lines.')
-    max_cycles = df[cycle_col].max()
-    print('The # of cycles is: ' + str(max_cycles))
+    max_cycles = df[cycle_col].max() 
+    print('The max cycle # is: ' + str(max_cycles))
 
     for c in cycles:
         rows = df[df[cycle_col]==c]
         no_rows = len(rows.index)
-        start_row = df.index[df[cycle_col]==c][0]
+        try:
+            start_row = df.index[df[cycle_col]==c][0]
+        except IndexError:
+            print('Selected cycle #'+ str(c) + ' is an invalid cycle.')
+            continue
         print('\n-----Cycle ' + str(c) + ' with ' + str(no_rows) + ' rows-----')
         for r in range(start_row,start_row + no_rows):
             if df[capacity_c_col].loc[r]!=0:
                 if df[current_col].loc[r+1]<0:
-                    print('Charge capacity at cycle ' + str(c) + ': ' + str(df[capacity_c_col].loc[r-1]/3500))
+                    print('Charge capacity at cycle ' + str(c) + ': ' + str(df[capacity_c_col].loc[r-1]/1000))
             elif r == start_row+no_rows-1:
-                print('Discharge capacity at cycle ' + str(c) + ': ' + str(df[capacity_d_col].loc[r]/3500))
+                print('Discharge capacity at cycle ' + str(c) + ': ' + str(df[capacity_d_col].loc[r]/1000))
 
 def main(argv):
     mode = 'env'
