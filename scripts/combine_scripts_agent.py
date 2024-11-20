@@ -250,16 +250,16 @@ class abstractModule():
         
 class abstractCell():
     def __init__(self, md, slash):
-        self.cell_metadata_table = 'cell_metadata'
-        self.cycle_metadata_table = 'cycle_metadata'
-        self.timeseries_table = 'cycle_timeseries'
-        self.buffer_table = 'cycle_timeseries_buffer'
-        self.stats_table = 'cycle_stats'
+        self.cell_metadata_table = ''
+        self.cycle_metadata_table = ''
+        self.timeseries_table = ''
+        self.buffer_table = ''
+        self.stats_table = ''
         self.cell_md = md #to get fixed md
         self.slash = slash
 
     #add cells to the database
-    def add_data(self, conn, path, slash, mapper): ##conflict how to pass all tables
+    def add_data(self, conn, path, mapper): ##conflict how to pass all tables
         #optional args: df_cell_ts
         #df_cell_ts = kwargs[df_cell_ts]
         logging.info('add cells')
@@ -275,21 +275,16 @@ class abstractCell():
             mapper = self.create_mapper(tester)
 
             logging.info("add file: " + file_id + " cell: " + cell_id)
-
             df_tmp = self.cell_md.iloc[ind]
-            print(df_tmp)
-
             df_cell_md, df_cycle_md = self.populate_metadata(df_tmp) ##conflict module?
-
             engine = create_engine(conn)
 
             # check if the cell is already there and report status
-
             status = self.get_status(cell_id, conn) ##conflict module
-
             if status=="completed":
-                print("skip cell_id: " + cell_id + '\n') ##conflict module
-
+                print("skipping cell_id: " + cell_id + " (import completed)") ##conflict module
+                continue 
+            print(df_tmp)
             if status=='new': 
                 logging.info('save cell metadata') ##conflict module
                 df_cell_md.to_sql(self.cell_metadata_table, con=engine, if_exists='append', chunksize=1000, index=False)##rconflict
@@ -573,7 +568,6 @@ class abstractCell():
                         start_time = time.time()
 
         return cycle_index_max
-
     
     def calc_cycle_quantities(self,df):
         logging.info('calculate quantities used in statistics')
@@ -640,26 +634,8 @@ class abstractCell():
             return arbin()
 
     def populate_metadata(self, df_c_md): ##conflict need to pass cell type from main
-        # Build cell metadata
-        df_cell_md = pd.DataFrame()
-        df_cell_md['cell_id'] = [df_c_md['cell_id']]
-        df_cell_md['anode'] = [df_c_md['anode']]
-        df_cell_md['cathode'] = [df_c_md['cathode']]
-        df_cell_md['source'] = [df_c_md['source']]
-        df_cell_md['ah'] = [df_c_md['ah']]
-        df_cell_md['form_factor'] = [df_c_md['form_factor']]
-        df_cell_md['test'] = [df_c_md['test']]
-        df_cell_md['tester'] = [df_c_md['tester']]
-        # Build cycle metadata
-        df_cycle_md = pd.DataFrame()
-        df_cycle_md['cell_id'] = [df_c_md['cell_id']]
-        df_cycle_md['crate_c'] = [df_c_md['crate_c']]
-        df_cycle_md['crate_d'] = [df_c_md['crate_d']]
-        df_cycle_md['soc_max'] = [df_c_md['soc_max']]
-        df_cycle_md['soc_min'] = [df_c_md['soc_min']]
-        df_cycle_md['temperature'] = [df_c_md['temperature']]
-
-        return df_cell_md, df_cycle_md
+        #gets overwritten by subclasses
+        return
     
     def get_cycle_index_max(self, cell_id, conn, table):
         sql_str = "select max(cycle_index)::int as max_cycles from " + table + " where cell_id = '" + cell_id + "'" ##rconflict
@@ -688,7 +664,7 @@ class abstractCell():
         db_conn.commit()
         record = curs.fetchall()
         if record:
-            return record[0]
+            return record[0][0]
         else:
             return 'new'
         
@@ -741,7 +717,68 @@ class arbin(abstractFileType):
 class liCell(abstractCell):
     def __init__(self,md,slash):
         super().__init__(md, slash)
+        self.cell_metadata_table = 'cell_metadata'
+        self.cycle_metadata_table = 'cycle_metadata'
+        self.timeseries_table = 'cycle_timeseries'
+        self.buffer_table = 'cycle_timeseries_buffer'
+        self.stats_table = 'cycle_stats'
         self.batt_type = 'li-ion'
+
+    def populate_metadata(self, df_c_md): ##conflict need to pass cell type from main
+        # Build cell metadata
+        df_cell_md = pd.DataFrame()
+        df_cell_md['cell_id'] = [df_c_md['cell_id']]
+        df_cell_md['anode'] = [df_c_md['anode']]
+        df_cell_md['cathode'] = [df_c_md['cathode']]
+        df_cell_md['source'] = [df_c_md['source']]
+        df_cell_md['ah'] = [df_c_md['ah']]
+        df_cell_md['form_factor'] = [df_c_md['form_factor']]
+        df_cell_md['test'] = [df_c_md['test']]
+        df_cell_md['tester'] = [df_c_md['tester']]
+        # Build cycle metadata
+        df_cycle_md = pd.DataFrame()
+        df_cycle_md['cell_id'] = [df_c_md['cell_id']]
+        df_cycle_md['crate_c'] = [df_c_md['crate_c']]
+        df_cycle_md['crate_d'] = [df_c_md['crate_d']]
+        df_cycle_md['soc_max'] = [df_c_md['soc_max']]
+        df_cycle_md['soc_min'] = [df_c_md['soc_min']]
+        df_cycle_md['temperature'] = [df_c_md['temperature']]
+
+        return df_cell_md, df_cycle_md
+
+class flowCell(abstractCell):
+    def __init__(self,md,slash):
+        super().__init__(md,slash)
+        self.cell_metadata_table = 'flow_cell_metadata'
+        self.cycle_metadata_table = 'flow_cycle_metadata'
+        self.timeseries_table = 'flow_cycle_timeseries'
+        self.buffer_table = 'flow_cycle_timeseries_buffer'
+        self.stats_table = 'flow_cycle_stats'
+        self.batt_type = 'flow'
+
+    def populate_cycle_metadata(df_c_md):
+        # Build cell metadata
+        df_cell_md = pd.DataFrame()
+        df_cell_md['cell_id'] = [df_c_md['cell_id']]
+        df_cell_md['flow_pattern'] = [df_c_md['flow pattern']]
+        df_cell_md['ne_material'] = [df_c_md['NE material']]
+        df_cell_md['pe_material'] = [df_c_md['PE material']]
+        df_cell_md['membrane'] = [df_c_md['membrane']]
+        df_cell_md['membrane_size'] = [df_c_md['membrane size (cm2)']]
+        df_cell_md['ne_active'] = [df_c_md['NE active']]
+        df_cell_md['initial_ne_active'] = [df_c_md['initial [NE active], M']]
+        df_cell_md['pe_active'] = [df_c_md['PE active']]
+        df_cell_md['initial_pe_active'] = [df_c_md['initial [PE active], M']]
+        df_cell_md['ne_volume'] = [df_c_md['NE volume (L)']]
+        df_cell_md['pe_volume'] = [df_c_md['PE volume (L)']]  
+        df_cell_md['flow_rate'] = [df_c_md['flow rate (L/min)']]
+        df_cell_md['test_type'] = [df_c_md['test type']]
+        #df_cell_md['source'] = [df_c_md['source']]
+        df_cell_md['test'] = [df_c_md['test']]
+        df_cell_md['tester'] = [df_c_md['tester']]
+        # Build cycle metadata - TODO
+        df_cycle_md = pd.DataFrame()
+        return df_cell_md, df_cycle_md
 
 class liModule(abstractModule):
     def __init__(self):
@@ -808,16 +845,20 @@ def main(argv):
     if data_type == 'li-cell':
         df_md = pd.read_excel(path + slash + "cell_list.xlsx")
         imp = liCell(df_md, slash)
-        tester = df_md['tester'][0]
-        if tester == 'arbin':
-            map = arbin()
-        # elif tester == 'generic':
-        #     map = generic()
+    elif data_type == 'flow-cell':
+        df_md = pd.read_excel(path + slash + "cell_list.xlsx")
+        imp = flowCell(df_md, slash)
     elif data_type == 'li-module':
         df_md = pd.read_excel(path + "module_list.xlsx")
         imp = liModule()
         mod_flag=True
-    imp.add_data(conn, path, slash, map)
+    #select tester type
+    tester = df_md['tester'][0]
+    if tester == 'arbin':
+        map = arbin()
+    # elif tester == 'generic':
+    #   map = generic()
+    imp.add_data(conn, path, map)
 
 
 if __name__ == "__main__":
