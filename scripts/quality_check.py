@@ -1,7 +1,7 @@
 import os
 import glob
 import pandas as pd
-import csv
+import yaml
 import sys, getopt
 
 # Copyright 2024 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this software.
@@ -9,15 +9,23 @@ import sys, getopt
 # Prints charge and discharge capacity for selected cycles
 # Reads a CSV file with TONGJI-KIT formatting as described in read_csv_rows()
 
-def read_csv_rows(file_path):
+def quality_check(file_path):
 
-    list_of_files = glob.glob(file_path + '*.csv*')
-    df = pd.read_csv(list_of_files[0]) #todo: modify when adding multiple files
-
-    cycle_col = 'cycle number'
-    current_col = '<I>/mA'
-    capacity_c_col = 'Q charge/mA.h'
-    capacity_d_col = 'Q discharge/mA.h'
+    #list_of_files = glob.glob(file_path + '*.csv*')
+    mapper = read_mapper()
+    list_of_tester_types = []
+    for dict in mapper:
+        list_of_tester_types.append(dict['tester'])
+    print('Please select file/tester type from the following options: ')
+    tester = input(str(list_of_tester_types))
+    for dict in mapper:
+        if tester == dict['tester']:
+            df = file_reader(file_path, dict['reader_func'], '')
+            col_dict = dict['column_names']
+            cycle_col = col_dict['cycle_index']
+            current_col = col_dict['i']
+            capacity_c_col = col_dict['Qc']
+            capacity_d_col = col_dict['Qd']
     cycle_str = input('Please input the cycles you wish to compare separated by commas (ex: 1,50,100,150,200): ')
     cycles = [int(s) for s in cycle_str.split(',')]
     print('This file has ' + str(len(df)) + ' lines.')
@@ -34,11 +42,22 @@ def read_csv_rows(file_path):
             continue
         print('\n-----Cycle ' + str(c) + ' with ' + str(no_rows) + ' rows-----')
         for r in range(start_row,start_row + no_rows):
-            if df[capacity_c_col].loc[r]!=0:
-                if df[current_col].loc[r+1]<0:
+            if df[current_col].loc[r]<0:
+                if df[current_col].loc[r-1]>=0 and r > 0:
                     print('Charge capacity at cycle ' + str(c) + ': ' + str(df[capacity_c_col].loc[r-1]/1000))
-            elif r == start_row+no_rows-1:
-                print('Discharge capacity at cycle ' + str(c) + ': ' + str(df[capacity_d_col].loc[r]/1000))
+                elif r == start_row+no_rows-1:
+                    print('Discharge capacity at cycle ' + str(c) + ': ' + str(df[capacity_d_col].loc[r]/1000))
+
+def file_reader(path, name, sheetname):
+    read_func = getattr(pd, name)
+    if name=='read_excel':
+        return read_func(path,sheet_name=sheetname)
+    else:
+        return read_func(path)
+
+def read_mapper():
+    with open(f'mapper.yaml','r') as f:
+        return list(yaml.safe_load_all(f))
 
 def main(argv):
     mode = 'env'
@@ -48,14 +67,14 @@ def main(argv):
         opts, args = getopt.getopt(argv, "h")
         path = args[0]
     except getopt.GetoptError:
-        print('run as: quality_check.py <path>')
+        print('run as: python quality_check.py <path>')
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print('run as: quality_check.py <path>')
+            print('run as: python quality_check.py <path>')
             sys.exit()
 
-    read_csv_rows(path)
+    quality_check(path)
 
 if __name__ == "__main__":
    main(sys.argv[1:])
