@@ -1,4 +1,4 @@
-#format:
+#FORMAT
 #tester : file/tester type
 #read_func : function 
 #column_dictionary:
@@ -46,8 +46,7 @@ tester : csv_ISU-ILCC #question: 'Time [s]' needs to be calculated from 'Timesta
 reader_func : read_csv
 #can add date time conversion function that is kept in yaml as necessary
 column_names:
-    cycle_index : Cycle
-    test_time : Time [s]
+    cycle_index : Cycle #test_time : Time [s] #doesn't exist, needs preprocessing
     i : Current (A)
     v : Voltage (V)
     date_time : Timestamp #may need to preprocess data if some columns don't exist

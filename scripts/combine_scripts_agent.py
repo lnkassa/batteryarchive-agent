@@ -13,8 +13,7 @@ import logging
 import logging.config
 import time
 
-from abstraction import abstractCell
-from abstraction import abstractModule
+from abstraction import *
 
 # Copyright 2021 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this software.
     
@@ -40,7 +39,7 @@ class liCell(abstractCell):
         df_t['cycle_time'] = 0
         no_cycles = int(df_t['cycle_index'].max())
 
-        for c_ind in df_c.index:
+        for c_ind in pd.RangeIndex(30):
             x = no_cycles + c_ind - 29
             
             df_f = df_t[df_t['cycle_index'] == x]
@@ -52,8 +51,6 @@ class liCell(abstractCell):
             if not df_f.empty:
                 try:
                     df_f['dt'] = df_f['test_time'].diff() / 3600.0
-                    df_f_c = df_f[df_f['i'] > 0]
-                    df_f_d = df_f[df_f['i'] < 0]
                     df_f = self.calc_cycle_quantities(df_f)
                     df_t['cycle_time'] = df_t['cycle_time'].astype('float64') #to address dtype warning
                     
@@ -119,6 +116,8 @@ class liCell(abstractCell):
             
             if not df_f.empty:
                 try:
+                    df_f_c = df_f[df_f['i'] > 0]
+                    df_f_d = df_f[df_f['i'] < 0]
                     df_c.iloc[c_ind, df_c.columns.get_loc('cycle_index')] = x
                     df_c.iloc[c_ind, df_c.columns.get_loc('v_max')] = df_f.loc[df_f['v'].idxmax()].v
                     df_c.iloc[c_ind, df_c.columns.get_loc('v_min')] = df_f.loc[df_f['v'].idxmin()].v
@@ -178,7 +177,8 @@ class liCell(abstractCell):
             filename = df_file['filename'][ind]
             cellpath = file_path + filename
             logging.info('buffering file: ' + filename)
-            if sheetname in mapper: #check if file has multiple sheets
+            '''
+            if 'sheetname' in mapper: #check if file has multiple sheets
                 timeseries_sheet = self.get_sheetname(cell_id,conn,cellpath,filename)
                 if timeseries_sheet == None:
                     print('No matching sheetname found. Buffering for cell '+ cell_id + ' failed.') 
@@ -187,6 +187,10 @@ class liCell(abstractCell):
                     df_time_series = pd.DataFrame()
             else: 
                 timeseries_sheet = '' #what to call this
+            '''
+            if True:
+                df_time_series = pd.DataFrame()
+                timeseries_sheet = ''
             # if mod_flag==True: #if this cell is part of a module, the timeseries df is passed down from the module class
             #      df_time_series_file = df_cell_ts
             # elif os.path.exists(cellpath):
@@ -194,13 +198,19 @@ class liCell(abstractCell):
             #         df_time_series_file = pd.read_csv(cellpath)
             #     elif file_type=='excel':
                 try:
-                    df_time_series_file = pd.read_excel(cellpath, sheet_name=timeseries_sheet)
+                    df_time_series_file = file_reader(cellpath, mapper['reader_func'],sheet_name=timeseries_sheet)
                 except ValueError as e:
                     print('\nI got a ValueError - reason: ' + str(e))
                     print('Make sure metadata and data files (and hidden files) are closed. \n')
                 try:
-                    for key,value in mapper.column_names.items():
-                        df_time_series[key] = df_time_series_file[value]
+                    keys = {'cycle_index','i','v','date_time','test_time','env_temperature','cell_temperature'}
+                    for key in keys:
+                        if key in mapper['column_names']:
+                            df_time_series[key] = df_time_series_file[mapper['column_names'][key]]
+                        if 'date_time' == key and 'test_time' not in mapper['column_names']:
+                            df_time_series['test_time']=convert_datetime_time(df_time_series_file,mapper['column_names'][key])
+                        elif 'test_time' not in mapper['column_names'] and 'date_time' not in mapper['column_names']:#change to check if all necessary columns exist
+                            print('There is no time data in the timeseries file.')
                     df_time_series['cell_id'] = cell_id
                     df_time_series['sheetname'] = filename + "|" + timeseries_sheet
                     df_time_series['component_level'] = 'cell'

@@ -257,7 +257,8 @@ class abstractCell():
             file_type = self.cell_md['file_type'][ind]
             source = self.cell_md['source'][ind]
             tester = self.cell_md['tester'][ind]
-            mapper = self.create_mapper(tester)
+            mapper = self.create_mapper(tester, source)
+            print(mapper)
 
             logging.info("add file: " + file_id + " cell: " + cell_id)
             df_tmp = self.cell_md.iloc[ind]
@@ -310,7 +311,8 @@ class abstractCell():
 
                         if not df_ts.empty:
                             start_time = time.time()
-                            df_cycle_stats, df_cycle_timeseries = self.calc_stats(df_ts, cell_id, engine)
+                            df_cycle_stats = self.calc_stats(df_ts, cell_id, engine)
+                            df_cycle_timeseries = self.calc_timeseries(df_ts,cell_id, engine)
                             print("calc_stats time: " + str(time.time() - start_time))
                             logging.info("calc_stats time: " + str(time.time() - start_time))
 
@@ -400,9 +402,15 @@ class abstractCell():
 
         return df
     
-    def create_mapper(self,tester):
-        if tester=='arbin':
-            return arbin()
+    def create_mapper(self,tester, source):
+        if tester == 'generic': #find a way to remove need for this
+            tester = 'csv_' + source
+        with open(f'mapper.yaml','r') as f:
+            for mapping in list(yaml.safe_load_all(f)):
+                if mapping['tester'] == tester:
+                    return mapping
+        print("Please verify that 'tester' in cell_list/module_list etc. matches with mapper.yaml")
+        os._exit(0)
 
     def populate_metadata(self, df_c_md): ##conflict need to pass cell type from main
         #gets overwritten by subclasses
@@ -494,10 +502,17 @@ class abstractCell():
                     return k
             return None
 
-def file_reader(path, name, sheetname):
+def file_reader(path, name, **kwargs):
     #reads yaml function name to chose pandas function for file reading
     read_func = getattr(pd, name)
     if name=='read_excel':
-        read_func(path,sheet_name=sheetname)
+        return read_func(path)(**kwargs)
     else:
-        read_func(path)
+        return read_func(path)
+    
+def convert_datetime_time(df,col_name):
+    df['pystamp']=pd.to_datetime(df[col_name]) #convert to python date-time format in ns
+    df['inttime']=df['pystamp'].astype(int)
+    df['inttime']=df['inttime'].div(10**9)
+    df['Time [s]']=df['inttime']-df['inttime'].iloc[0]
+    return df['Time [s]']
