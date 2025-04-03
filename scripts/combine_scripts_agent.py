@@ -26,8 +26,8 @@ class arbin():
                                'date_time':'Date_Time'}
 
 class liCell(abstractCell):
-    def __init__(self,md,slash):
-        super().__init__(md, slash)
+    def __init__(self,md):
+        super().__init__(md)
         self.cell_metadata_table = 'cell_metadata'
         self.cycle_metadata_table = 'cycle_metadata'
         self.timeseries_table = 'cycle_timeseries'
@@ -159,7 +159,8 @@ class liCell(abstractCell):
         logging.info('adding files')
         md = self.cell_md
         file_type = md.iloc[0]['file_type']
-        file_path = path + self.slash + file_id + self.slash
+        file_path = os.path.join(path, file_id)
+        print(file_path)
         listOfFiles = glob.glob(file_path + '*.'+ file_type +'*') ##rconflict
         #listOfFiles = glob.glob(file_path + '*.xls*')
         for i in range(len(listOfFiles)):
@@ -176,6 +177,7 @@ class liCell(abstractCell):
         for ind in df_file.index:
             filename = df_file['filename'][ind]
             cellpath = file_path + filename
+            print(cellpath)
             logging.info('buffering file: ' + filename)
             '''
             if 'sheetname' in mapper: #check if file has multiple sheets
@@ -256,8 +258,8 @@ class liCell(abstractCell):
         return df_cell_md, df_cycle_md
 
 class flowCell(abstractCell):
-    def __init__(self,md,slash):
-        super().__init__(md,slash)
+    def __init__(self,md):
+        super().__init__(md)
         self.cell_metadata_table = 'flow_cell_metadata'
         self.cycle_metadata_table = 'flow_cycle_metadata'
         self.timeseries_table = 'flow_cycle_timeseries'
@@ -387,21 +389,15 @@ def main(argv):
     logging.info('command line: ' + str(opts))
     logging.info('configuration: ' + str(data))
 
-    # needed to maintain compatibility with windows machines
-    if style == 'unix':
-        slash = "/"
-    elif style == 'windows':
-        slash = r'\\'
-
     mod_flag=False
     if data_type == 'li-cell':
-        df_md = pd.read_excel(path + slash + "cell_list.xlsx")
-        imp = liCell(df_md, slash)
+        df_md = pd.read_excel(os.path.join(path, '') + "cell_list.xlsx")
+        imp = liCell(df_md)
     elif data_type == 'flow-cell':
-        df_md = pd.read_excel(path + slash + "cell_list.xlsx")
-        imp = flowCell(df_md, slash)
+        df_md = pd.read_excel(os.path.join(path, '') + "cell_list.xlsx")
+        imp = flowCell(df_md)
     elif data_type == 'li-module':
-        df_md = pd.read_excel(path + "module_list.xlsx")
+        df_md = pd.read_excel(os.path.join(path,'') + "module_list.xlsx")
         imp = liModule()
         mod_flag=True
     imp.add_data(conn, path, map)
