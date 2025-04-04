@@ -1,0 +1,186 @@
+# coding: utf-8
+# Copyright 2025 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this software.
+
+import logging
+import logging.config
+import pandas as pd
+pd.options.mode.chained_assignment = None  # default='warn'
+import pathlib as Path
+import psycopg2
+import sys, getopt
+import time
+import yaml
+
+from abstractCell import abstractCell
+from abstractFileType import abstractFileType
+
+#do i need to use the ABC class --yes
+#file name same as class name? --maybe
+
+#new importer file for (module, cell, system) and (cycle, abuse, calorimetry)-- should there be an importer class?
+#how to choose file type from metadata
+#cell class deals with individual cells and groups of cells
+
+def add_module_data(engine, module:abstractModule):
+    return
+
+def add_cell_data(engine, conn, path, cells_to_import:list[abstractCell], *md): 
+    #adds data to database
+
+    if md not in locals():
+        md = pd.read_excel(Path(path, "cell_list.xlsx"))
+    else:
+        #md was passed by parent
+        pass
+    #logging
+    for ind, cell in enumerate(cells_to_import):
+        row = cell.set_md(md, ind)
+        id = cell.get_cell_id()
+        file_id = cell.get_file_id()
+        file_type = cell.get_file_type()
+        file_path = cell.set_path(path)
+        file_type_obj = get_file_type_obj(file_type)
+    
+        cell_md, cycle_md = cell.populate_metadata(md)
+
+        status = get_status(id, cell.cell_metadata_table, conn)
+        if status=='completed':
+            #logging skipping cell id 
+            pass
+        if status=='new':
+            logging.info('save cell metadata')
+            cell_md.to_sql(cell.cell_metadata_table, con=engine, if_exists='append', chunksize=1000, index=False)
+            logging.info('save cycle metadata')
+            cycle_md.to_sql(cell.cycle_metadata_table, con=engine, if_exists='append', chunksize=1000, index=False)
+            set_status(id, cell.cell_metadata_table, conn, status='buffering', id_type='cell_id')
+        if status=='buffering':
+            #logging buffering cell id
+            cycle_index_max = buffer()
+            set_status(id, cell.cell_metadata_table, conn, status='processing', id_type='cell_id')
+        if status=='processing':
+            chunk_size = 30 #number of cells to process at once
+            #do processing
+        set_status(id, cell.cell_metadata_table, conn, status='completed', id_type='cell_id')
+        clear_buffer(id, cell.buffer_table, conn, id_type='cell_id')
+    
+def get_file_type_obj(file_type):
+    #make this nicer in future
+    import arbin
+    import matlab
+    if file_type == 'arbin':
+        return arbin(abstractFileType)
+    elif file_type == 'matlab':
+        return matlab(abstractFileType)
+
+def buffer(file_type:abstractFileType):
+    #called by add_data, adds data to buffer table
+    return
+
+def clear_buffer(id, buffer_table, conn, id_type=''):
+    # this method will delete data for a cell_id. Use with caution as there is no undo
+    db_conn = psycopg2.connect(conn)
+    curs = db_conn.cursor()
+    curs.execute("delete from " + buffer_table + " where " + id_type + "='" + id + "'")
+    db_conn.commit()
+    curs.close()
+    db_conn.close()
+    return
+
+def get_status(id, md_table, conn):
+    sql_str = "select status from " + md_table + " where cell_id = '" + id + "'"
+    db_conn = psycopg2.connect(conn)
+    curs = db_conn.cursor()
+    curs.execute(sql_str)
+    db_conn.commit()
+    record = curs.fetchall()
+    if record:
+        return record[0][0]
+    else:
+        return 'new'
+    return
+
+def set_status(id, md_table, conn, status='', id_type=''):
+    sql_str = "update " + md_table + " set status = '" + status + "' where " + id_type + " = '" + id + "'"
+    db_conn = psycopg2.connect(conn)
+    curs = db_conn.cursor()
+    curs.execute(sql_str)
+    db_conn.commit()
+    curs.close()
+    db_conn.close()
+    return
+
+def get_cycle_index_max():
+    #gets max cycle from database
+    return
+
+def main():
+
+    # command line variables that can be used to run from an IDE without passing arguments
+    mode = 'env'
+    path = r'\\'
+
+    # initializing the logger
+    logging.basicConfig(format='%(asctime)s %(message)s', filename='blc-python.log', level=logging.DEBUG)
+    logging.info('starting')
+
+    #read command line
+    try:
+        opts, args = getopt.getopt(argv, "ht:p:", ["dataType=","path="])
+    except getopt.GetoptError:
+        print('run as: data_import_agent.py -t <dataType> -p <path>')
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print('run as: data_import_agent.py -t <dataType> -p <path>')
+            sys.exit()
+        elif opt in ("-p", "--path"):
+            path = arg
+        elif opt in ("-t", "--dataType"):
+            data_type = arg
+
+    # read database connection
+    conn = ''
+    try:
+        env = yaml.safe_load(open('../env'))
+        x = env.split(" ")
+        for i in x:
+            j = i.split("=")
+            if j[0] == 'LOCAL_CONNECTION':
+                conn =  j[1]
+    except:
+        print("Error opening env file:", sys.exc_info()[0])
+    
+    # read configuration values
+    data = yaml.safe_load(open('battery-blc-library.yaml'))
+
+    #are these used?
+    plot = data['environment']['PLOT']
+    save = data['environment']['SAVE']
+    style = data['environment']['STYLE']
+
+    # use default if env file not there
+    if conn == '':
+        conn = data['environment']['DATABASE_CONNECTION']
+
+    logging.info('command line: ' + str(opts))
+    logging.info('configuration: ' + str(data))
+
+    #create engine
+    engine = create_engine(conn)
+    from lithiumCell import lithiumCell
+    liCell = lithiumCell(abstractCell) # class LithiumCell(AbstractCell)
+
+    # mod_flag=False
+    if data_type == 'li-cell':
+        add_cell_data(engine, conn, cell=liCell(path))
+    # elif data_type == 'flow-cell':
+    #     df_md = pd.read_excel(os.path.join(path, '') + "cell_list.xlsx")
+    #     imp = flowCell(df_md)
+    # elif data_type == 'li-module':
+    #     df_md = pd.read_excel(os.path.join(path,'') + "module_list.xlsx")
+    #     imp = liModule()
+    #     mod_flag=True
+    return
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
