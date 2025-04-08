@@ -23,12 +23,12 @@ class abstractCell(ABC):
         return
     
     @abstractmethod
-    def get_file_id(self):
-        return
+    def set_file_id(self):
+        pass
     
     @abstractmethod
-    def get_file_type(self):
-        return
+    def set_file_type(self):
+        pass
    
     @abstractmethod
     def calc_timeseries(self):

@@ -28,11 +28,11 @@ class lithiumCell(abstractCell):
     def get_cell_id(self):
         return self.md['cell_id']
     
-    def get_file_id(self):
-        return self.md['file_id']
+    def set_file_id(self):
+        self.file_id = self.md['file_id']
     
-    def get_file_type(self):
-        return self.md['file_type']
+    def set_file_type(self):
+        self.file_type = self.md['file_type']
    
     def calc_timeseries(self, df_t):
         df_t['cycle_time'] = 0

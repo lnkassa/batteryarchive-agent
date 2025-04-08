@@ -24,22 +24,21 @@ from abstractFileType import abstractFileType
 def add_module_data(engine, module:abstractModule):
     return
 
-def add_cell_data(engine, conn, path, cells_to_import:list[abstractCell], *md): 
+def add_cell_data(engine, conn, path, cells_to_import:list[abstractCell], *args): 
     #adds data to database
 
-    if md not in locals():
+    if md not in args:
         md = pd.read_excel(Path(path, "cell_list.xlsx"))
     else:
         #md was passed by parent
         pass
     #logging
     for ind, cell in enumerate(cells_to_import):
-        row = cell.set_md(md, ind)
+        cell.set_md(md, ind)
         id = cell.get_cell_id()
-        file_id = cell.get_file_id()
-        file_type = cell.get_file_type()
-        file_path = cell.set_path(path)
-        file_type_obj = get_file_type_obj(file_type)
+        cell.set_file_id()
+        cell.set_file_type()
+        cell.set_path(path)
     
         cell_md, cycle_md = cell.populate_metadata(md)
 
@@ -54,8 +53,8 @@ def add_cell_data(engine, conn, path, cells_to_import:list[abstractCell], *md):
             cycle_md.to_sql(cell.cycle_metadata_table, con=engine, if_exists='append', chunksize=1000, index=False)
             set_status(id, cell.cell_metadata_table, conn, status='buffering', id_type='cell_id')
         if status=='buffering':
-            #logging buffering cell id
-            cycle_index_max = buffer()
+            logging.info('adding files')
+            cycle_index_max = buffer(cell, get_file_type_obj(cell.file_type), *args)
             set_status(id, cell.cell_metadata_table, conn, status='processing', id_type='cell_id')
         if status=='processing':
             chunk_size = 30 #number of cells to process at once
@@ -72,8 +71,14 @@ def get_file_type_obj(file_type):
     elif file_type == 'matlab':
         return matlab(abstractFileType)
 
-def buffer(file_type:abstractFileType):
-    #called by add_data, adds data to buffer table
+def buffer(cell:abstractCell, file_type_obj:abstractFileType):
+    #if file type
+    list_ts_files = [file for file in cell.path.iterdir()] 
+    try:
+        ts = file_type_obj.file_to_df()
+    except ValueError as e:
+        print('\nI got a ValueError - reason: ' + str(e))
+        print('Make sure metadata and data files (and hidden files) are closed. \n')
     return
 
 def clear_buffer(id, buffer_table, conn, id_type=''):
