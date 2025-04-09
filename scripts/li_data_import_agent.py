@@ -9,7 +9,7 @@ import h5py #for mat files
 pd.options.mode.chained_assignment = None  # default='warn'
 import matplotlib.pyplot as plt
 import psycopg2
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 import yaml
 import sys, getopt
 import logging
@@ -940,11 +940,12 @@ def clear_buffer(cell_id, conn):
 
 def set_cell_status(cell_id, status, conn):
 
-    sql_str = "update cell_metadata set status = '" + status + "' where cell_id = '" + cell_id + "'"
+    sql_str = "update cell_metadata set status = %s where cell_id = %s"
+    #sql_str = "update cell_metadata set status = '" + status + "' where cell_id = '" + cell_id + "'"
 
     db_conn = psycopg2.connect(conn)
     curs = db_conn.cursor()
-    curs.execute(sql_str)
+    curs.execute(sql_str, (status, cell_id))
     db_conn.commit()
     curs.close()
     db_conn.close()
@@ -1073,7 +1074,7 @@ def add_ts_md_cycle(cell_list, conn, save, plot, path, slash):
 
         df_tmp = df_excel.iloc[ind]
 
-        print(df_tmp)
+        print(df_tmp)#check last line
 
         df_cell_md, df_cycle_md = populate_cycle_metadata(df_tmp)
         
@@ -1151,10 +1152,11 @@ def add_ts_md_cycle(cell_list, conn, save, plot, path, slash):
 
                     sql_cell =  " cell_id='" + cell_id + "'" 
                     sql_cycle = " and cycle_index>=" + str(start_cycle) + " and cycle_index<=" + str(end_cycle)
-                    sql_str = "select * from cycle_timeseries_buffer where " + sql_cell + sql_cycle + " order by test_time"
+                    sql_str = text("select * from cycle_timeseries_buffer where" + sql_cell + sql_cycle + " order by test_time")
 
                     print(sql_str)
-                    df_ts = pd.read_sql(sql_str, conn)
+                    with engine.begin() as connection:
+                        df_ts = pd.read_sql(sql_str, connection)
 
                     df_ts.drop('sheetname', axis=1, inplace=True)
 
@@ -1178,7 +1180,6 @@ def add_ts_md_cycle(cell_list, conn, save, plot, path, slash):
                         #get_cycle_stats_index_max(cell_id, conn)
 
             status='completed'
-
             set_cell_status(cell_id, status, conn)
 
             clear_buffer(cell_id, conn)
