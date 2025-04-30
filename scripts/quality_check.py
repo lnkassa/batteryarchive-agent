@@ -35,19 +35,24 @@ def quality_check(file_path):
     for c in cycles:
         rows = df[df[cycle_col]==c]
         no_rows = len(rows.index)
+        if c>510:
+            print(df[current_col])
         try:
             start_row = df.index[df[cycle_col]==c][0]
         except IndexError:
             print('Selected cycle #'+ str(c) + ' is an invalid cycle.')
             continue
         print('\n-----Cycle ' + str(c) + ' with ' + str(no_rows) + ' rows-----')
+        test = 0
         for r in range(start_row,start_row + no_rows):
+            if df[capacity_c_col].loc[r] > test:
+                test = df[capacity_c_col].loc[r]
             if df[current_col].loc[r]<0:
                 if df[current_col].loc[r-1]>=0 and r > 0:
-                    print('Charge capacity at cycle ' + str(c) + ': ' + str(df[capacity_c_col].loc[r-1]/1000))
+                    print('Charge capacity at cycle ' + str(c) + ': ' + str(df[capacity_c_col].loc[r-1]))
                 elif r == start_row+no_rows-1:
-                    print('Discharge capacity at cycle ' + str(c) + ': ' + str(df[capacity_d_col].loc[r]/1000))
-
+                    print('Discharge capacity at cycle ' + str(c) + ': ' + str(df[capacity_d_col].loc[r]))
+        print('max ah_c: '+str(test))
 def file_reader(path, name, sheetname):
     read_func = getattr(pd, name)
     if name=='read_excel':

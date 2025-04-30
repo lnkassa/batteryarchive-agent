@@ -2,7 +2,7 @@
 # Copyright 2025 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this software.
 from abc import ABC, abstractmethod
 
-class abstractCell(ABC):
+class AbstractCell(ABC):
     def __init__(self):
         self.cell_metadata_table = ''
         self.cycle_metadata_table = ''
@@ -11,9 +11,9 @@ class abstractCell(ABC):
         self.stats_table = ''
 
     @abstractmethod
-    def set_md(self, md, ind):
+    def set_tester(self):
         pass
-
+    
     @abstractmethod
     def set_path(self, path):
         pass
@@ -35,7 +35,7 @@ class abstractCell(ABC):
         pass
     
     @abstractmethod
-    def calc_stats(self):
+    def calc_cycle(self):
         pass
     
     @abstractmethod

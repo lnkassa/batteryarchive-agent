@@ -9,7 +9,7 @@ tester : arbin
 reader_func : read_excel
 column_names:
   cycle_index : Cycle_Index
-  test_time : Test_time(s)
+  test_time : Test_Time(s)
   i : Current(A)
   v : Voltage(V)
   date_time : Date_Time

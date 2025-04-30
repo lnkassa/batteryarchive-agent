@@ -105,6 +105,10 @@ def calc_cycle_quantities(df):
         
     df_tmp = pd.DataFrame(data=tmp_arr[:, [3]], columns=["ah_c"])
     df_tmp.index += df.index[0]
+    print(df_tmp['ah_c']/3600.0)
+    #check rows where NAN compare to original data file
+    #value makes sense from given current and voltage, integrate
+    #why would code throw NAN, ask Irving
     df['ah_c'] = df_tmp['ah_c']/3600.0
 
     df_tmp = pd.DataFrame(data=tmp_arr[:, [4]], columns=["e_c"])
@@ -127,7 +131,6 @@ def calc_cycle_quantities(df):
 
 # calculate statistics and cycle time
 def calc_stats(df_t, ID):
-
     logging.info('calculate cycle time and cycle statistics')
     df_t['cycle_time'] = 0
 
@@ -174,9 +177,8 @@ def calc_stats(df_t, ID):
     df_c = df_c.astype(convert_dict)
 
     for c_ind in df_c.index:
-        #x = c_ind + 1
         x = no_cycles + c_ind - 29
-        
+        print(x)
         df_f = df_t[df_t['cycle_index'] == x] ##optimize call
         
         df_f['ah_c'] = 0
@@ -202,6 +204,8 @@ def calc_stats(df_t, ID):
                 df_f_d = df_f[df_f['i'] < 0]
 
                 df_f = calc_cycle_quantities(df_f)
+                if x == 532:
+                    print(df_f)
                 df_t['cycle_time'] = df_t['cycle_time'].astype('float64') #to address dtype warning
 
                 df_t.loc[df_t.cycle_index == x, 'cycle_time'] = df_f['cycle_time']
@@ -1081,8 +1085,10 @@ def add_ts_md_cycle(cell_list, conn, save, plot, path, slash):
         engine = create_engine(conn)
 
         # check if the cell is already there and report status
-
-        status = check_cell_status(cell_id, conn)
+        try:
+            status = check_cell_status(cell_id, conn)
+        except psycopg2.OperationalError:
+            print('database is not available')
 
         if status=="completed":
             print("skip cell_id: " + cell_id)
@@ -1162,7 +1168,8 @@ def add_ts_md_cycle(cell_list, conn, save, plot, path, slash):
 
                     if not df_ts.empty:
                         start_time = time.time()
-                        df_cycle_stats, df_cycle_timeseries = calc_stats(df_ts, cell_id)
+                        df_cycle_stats = calc_stats(df_ts, cell_id)
+                        df_cycle_timeseries = 
                         print("calc_stats time: " + str(time.time() - start_time))
                         logging.info("calc_stats time: " + str(time.time() - start_time))
 
