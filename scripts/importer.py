@@ -16,19 +16,47 @@ from abstractCell import AbstractCell
 from abstractModule import AbstractModule
 from abstractFileType import AbstractFileType
 
-#cell class deals with individual cells and groups of cells
-#how to deal with individual metadata 
-#add types and docstrings
+# update method:
+#   1) delete everything
+#   2) add everything
+# old update method:
+#   1) find cells in db where status == update
+#   2) loop through cells and calculate stats and ts data
+#   3) delete old stats
+#   4) add new stats
+#   5) delete old ts
+#   6) add new ts
+
 # done 0) find place for column conversion date_time <-> test_time 
-# 1) update data
-# 1.5) move column mapping to file type classes
+# done 1) update data
+# done 1.5) move column mapping to file type classes
 # 2) add module data
 # 3) add flow cells
 # 4) add additional file types
 # 5) create __init__ and package
 # 5) docstrings and types
-def add_module_data(engine, module:AbstractModule):
+def add_module_data(engine, conn, path, md, modules_to_import:list[AbstractModule]):
     #1) import module metadata
+    for ind, module in enumerate(modules_to_import):
+        id = module.module_id
+        module.set_path(path)
+
+        print(module.md)
+        module_md, cell_md = module.populate_metadata()
+
+        try:
+            status = get_status(id, module.module_metadata_table, conn, id_type='module')
+        except psycopg2.OperationalError:
+            print('Database is not available.')
+        if status=='completed':
+            #logging skipping cell id 
+            pass
+        if status=='new':
+            logging.info('save module metadata')
+            module_md.to_sql(module.module_metadata_table, con=engine, if_exists='append', chunksize=1000, index=False)
+            cells_to_import = [module.child_type(path,row) for ind, row in cell_md.iterrows()]
+            #need to convert module to cell ts first
+            add_cell_data(engine, conn, path, cell_md, cells_to_import)
     #2) convert module format to cell
     #3) import cell data (call add_cell_data)
     return
@@ -47,7 +75,7 @@ def add_cell_data(engine, conn, path, md, cells_to_import:list[AbstractCell], *a
         cell_md, cycle_md = cell.populate_metadata()
         
         try:
-            status = get_status(id, cell.cell_metadata_table, conn)
+            status = get_status(id, cell.cell_metadata_table, conn, id_type='cell_id')
         except psycopg2.OperationalError:
             print('Database is not available.')
         if status=='completed':
@@ -73,7 +101,11 @@ def add_cell_data(engine, conn, path, md, cells_to_import:list[AbstractCell], *a
             process(cell, engine, conn)
         set_status(id, cell.cell_metadata_table, conn, status='completed', id_type='cell_id')
         clear_buffer(id, cell.buffer_table, conn, id_type='cell_id')
-    
+
+def update_cell_data(engine, conn, path, md, cells_to_import:list[AbstractCell]):
+    delete_all(conn, cells_to_import, id_type='cell_id')
+    add_cell_data(engine, conn, path, md, cells_to_import)
+
 def buffer(cell:AbstractCell, file_type_obj:AbstractFileType):
     #if file type
     list_ts_fldr = [file for file in pathlib.Path(cell.file_path).glob('./*')]
@@ -156,8 +188,8 @@ def clear_buffer(id, buffer_table, conn, id_type=''):
     db_conn.close()
     return
 
-def get_status(id, md_table, conn):
-    sql_str = "select status from " + md_table + " where cell_id = '" + id + "'"
+def get_status(id, md_table, conn, id_type):
+    sql_str = "select status from " + md_table + " where " + id_type + "= '" + id + "'"
     db_conn = psycopg2.connect(conn)
     curs = db_conn.cursor()
     curs.execute(sql_str)
@@ -171,7 +203,7 @@ def get_status(id, md_table, conn):
     return status
 
 def set_status(id, md_table, conn, status, id_type=''):
-    sql_str = "update " + md_table + " set status = '" + status + "' where " + id_type + " = '" + id + "'"
+    sql_str = "update " + md_table + " set status = '" + status + "' where " + id_type + "= '" + id + "'"
     db_conn = psycopg2.connect(conn)
     curs = db_conn.cursor()
     curs.execute(sql_str)
@@ -201,10 +233,30 @@ def get_file_type_obj(tester):
     #create __init__ file import once 
     from arbin import Arbin
     from matlab import Matlab
+    from uconn import UCONN
     if tester == 'arbin':
         return Arbin()
     elif tester == 'matlab':
         return Matlab()
+    if tester == 'generic': ##this is not ideal, but all previous metadata uses 'generic'
+        return UCONN()
+
+def delete_all(conn, cells_to_delete:list[AbstractCell], id_type):
+    print('Deleting...')
+    all_strs = ''
+    for cell in cells_to_delete:
+        for var, value in vars(cell).items():
+            if var.endswith('_table'):
+                table = value
+                sql_str = "delete from " + table + " where " + id_type + "='" + cell.cell_id + "';\n"
+                all_strs = all_strs + sql_str
+    print(all_strs)
+    db_conn = psycopg2.connect(conn)
+    curs = db_conn.cursor()
+    curs.execute(all_strs)
+    db_conn.commit()
+    curs.close()
+    db_conn.close()
 
 def main(argv):
 
@@ -218,18 +270,24 @@ def main(argv):
 
     #read command line
     try:
-        opts, args = getopt.getopt(argv, "ht:p:", ["dataType=","path="])
+        opts_and_args, args = getopt.getopt(argv, "hi:t:p:", ["importType=","dataType=","path="])
     except getopt.GetoptError:
-        print('run as: data_import_agent.py -t <dataType> -p <path>')
+        print('run as: importer.py -i <importType> -t <dataType> -p <path>')
         sys.exit(2)
-    for opt, arg in opts:
+    opts = [opt for opt,arg in opts_and_args]
+    for opt, arg in opts_and_args:
         if opt == '-h':
-            print('run as: data_import_agent.py -t <dataType> -p <path>')
+            print('run as: importer.py -i <importType> -t <dataType> -p <path>')
             sys.exit()
+        elif opt in ("-i", "importType"):
+            import_type = arg
         elif opt in ("-p", "--path"):
             path = arg
         elif opt in ("-t", "--dataType"):
             data_type = arg
+    if "-i" not in opts:
+        print("Defaulting to adding data.")
+        import_type = 'add'
 
     # read database connection
     conn = ''
@@ -261,21 +319,24 @@ def main(argv):
     #create engine
     engine = create_engine(conn)
     
-    from lithiumCell import lithiumCell
-    #liCell = lithiumCell(path) # class LithiumCell(AbstractCell)
+    from lithiumCell import LithiumCell
+    from lithiumModule import LithiumModule
 
     # mod_flag=False
     if data_type == 'li-cell':
         md = pd.read_excel(pathlib.PurePath(path).joinpath("cell_list.xlsx"))
-        cells_to_import = [lithiumCell(path,row) for ind, row in md.iterrows()]
-        add_cell_data(engine, conn, path, md, cells_to_import)
+        cells_to_import = [LithiumCell(path,row) for ind, row in md.iterrows()]
+        if import_type == 'add':
+            add_cell_data(engine, conn, path, md, cells_to_import)
+        elif import_type == 'update':
+            update_cell_data(engine, conn, path, md, cells_to_import)
     # elif data_type == 'flow-cell':
     #     df_md = pd.read_excel(os.path.join(path, '') + "cell_list.xlsx")
     #     imp = flowCell(df_md)
-    # elif data_type == 'li-module':
-    #     df_md = pd.read_excel(os.path.join(path,'') + "module_list.xlsx")
-    #     imp = liModule()
-    #     mod_flag=True
+    elif data_type == 'li-module':
+        md = pd.read_excel(pathlib.PurePath(path).joinpath("module_list.xlsx"))
+        modules_to_import = [LithiumModule(row) for ind, row in md.iterrows()]
+        add_module_data(engine, conn, path, md, modules_to_import)
     return
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ import pathlib
 
 from abstractCell import AbstractCell
 
-class lithiumCell(AbstractCell):
+class LithiumCell(AbstractCell):
     def __init__(self, path, md):
         self.cell_metadata_table = 'cell_metadata'
         self.cycle_metadata_table = 'cycle_metadata'
@@ -20,7 +20,7 @@ class lithiumCell(AbstractCell):
         self.set_file_id()
         self.set_tester()
         self.set_file_type()
-        self.set_path()
+        #self.set_path()
         #self.parent = parent #if cell is part of module
 
     def set_tester(self):

@@ -25,3 +25,6 @@ class Arbin(AbstractFileType):
                     return df_ts_file[sheet], sheet
         else:
             return read_func(path), None
+    
+    def datetime_to_testtime(self):
+        return super().datetime_to_testtime()

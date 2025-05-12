@@ -220,8 +220,8 @@ def calc_stats(df_t, ID):
                 df_f_d = df_f[df_f['i'] < 0]
 
                 if x == 7978:
-                    #df_f = calc_cycle_quantities(df_f, True)
-                    df_f = integrate(df_f)
+                    df_f = calc_cycle_quantities(df_f, True)
+                    #df_f = integrate(df_f)
                     #print(df_f)
                 else:
                     df_f = calc_cycle_quantities(df_f, False)

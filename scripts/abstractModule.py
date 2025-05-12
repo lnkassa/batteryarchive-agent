@@ -6,3 +6,21 @@ from abc import ABC, abstractmethod
 class AbstractModule(ABC):
     def __init__():
         pass
+
+    def set_tester(self):
+        pass
+        
+    def set_path(self, path):
+        pass
+    
+    def set_file_id(self):
+        pass
+    
+    def set_file_type(self):
+        pass
+
+    def populate_metadata(self):
+        return
+    
+    def create_cell_df(self, path, row):
+        return

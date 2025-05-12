@@ -39,3 +39,6 @@ class Matlab(AbstractFileType):
             
         print(df_battery)
         return df_battery
+    
+    def datetime_to_testtime(self):
+        return super().datetime_to_testtime()
