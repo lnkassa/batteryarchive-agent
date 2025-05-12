@@ -13,21 +13,31 @@ import time
 import yaml
 
 from abstractCell import AbstractCell
+from abstractModule import AbstractModule
 from abstractFileType import AbstractFileType
 
 #cell class deals with individual cells and groups of cells
 #how to deal with individual metadata 
-
-
-def add_module_data(engine, module:abstractModule):
+#add types and docstrings
+# done 0) find place for column conversion date_time <-> test_time 
+# 1) update data
+# 1.5) move column mapping to file type classes
+# 2) add module data
+# 3) add flow cells
+# 4) add additional file types
+# 5) create __init__ and package
+# 5) docstrings and types
+def add_module_data(engine, module:AbstractModule):
+    #1) import module metadata
+    #2) convert module format to cell
+    #3) import cell data (call add_cell_data)
     return
-
 
 def add_cell_data(engine, conn, path, md, cells_to_import:list[AbstractCell], *args): 
     #adds data to database
     #logging
     for ind, cell in enumerate(cells_to_import):
-        id = cell.get_cell_id()
+        id = cell.cell_id
         cell.set_file_id()
         cell.set_file_type()
         cell.set_path(path)
@@ -55,25 +65,15 @@ def add_cell_data(engine, conn, path, md, cells_to_import:list[AbstractCell], *a
             start_time = time.time()
             df_ts = buffer(cell, get_file_type_obj(cell.tester), *args)
             df_ts.to_sql(cell.buffer_table, con=engine, if_exists='append', chunksize=1000, index=False)
-            print("saved=" + cell.get_cell_id() + " time: " + str(time.time() - start_time))
+            print("saved=" + cell.cell_id + " time: " + str(time.time() - start_time))
             start_time = time.time()
             status='processing'
             set_status(id, cell.cell_metadata_table, conn, status, id_type='cell_id')
         if status=='processing':
             process(cell, engine, conn)
-            #do processing
         set_status(id, cell.cell_metadata_table, conn, status='completed', id_type='cell_id')
         clear_buffer(id, cell.buffer_table, conn, id_type='cell_id')
     
-def get_file_type_obj(tester):
-    #make this nicer in future
-    from arbin import Arbin
-    from matlab import Matlab
-    if tester == 'arbin':
-        return Arbin()
-    elif tester == 'matlab':
-        return Matlab()
-
 def buffer(cell:AbstractCell, file_type_obj:AbstractFileType):
     #if file type
     list_ts_fldr = [file for file in pathlib.Path(cell.file_path).glob('./*')]
@@ -93,13 +93,11 @@ def buffer(cell:AbstractCell, file_type_obj:AbstractFileType):
                 if key in file_type_obj.col_mapping:
                     df_ts[key] = df_ts_file[file_type_obj.col_mapping[key]]
                 if 'date_time' == key and 'test_time' not in file_type_obj.col_mapping:
-                    #TODO
-                    #maybe can keep this in file type obj
-                    #df_ts['test_time']=convert_datetime_time(df_ts_file,file_type_obj.col_mapping[key])
-                    pass
+                    df_ts['test_time'] = file_type_obj.datetime_to_testtime(df_ts_file[key])
                 elif 'test_time' not in file_type_obj.col_mapping and 'date_time' not in file_type_obj.col_mapping:#change to check if all necessary columns exist
+                    #exit code
                     print('There is no time data in the timeseries file.')
-            df_ts['cell_id'] = cell.get_cell_id()
+            df_ts['cell_id'] = cell.cell_id
             df_ts['sheetname'] = cell.file_id + "|" + sheetname
             df_ts['component_level'] = 'cell'
             cycle_index_file_max = df_ts['cycle_index'].max()
@@ -114,15 +112,15 @@ def buffer(cell:AbstractCell, file_type_obj:AbstractFileType):
 
 def process(cell:AbstractCell, engine, conn):
     chunk_size = 30 #number of cells to process at once
-    cycle_index_max = get_cycle_index_max(conn, cell.buffer_table, cell.get_cell_id())
-    cycle_stats_index_max = get_cycle_index_max(conn, cell.stats_table, cell.get_cell_id())
+    cycle_index_max = get_cycle_index_max(conn, cell.buffer_table, cell.cell_id)
+    cycle_stats_index_max = get_cycle_index_max(conn, cell.stats_table, cell.cell_id)
     start_cycle = 1
     start_time = time.time()
     for i in range(cycle_index_max+1):
         if (i-1) % chunk_size == 0 and i > 0 and i>cycle_stats_index_max:
             start_cycle = i
             end_cycle = start_cycle + chunk_size - 1
-            sql_cell =  " cell_id='" + cell.get_cell_id() + "'" 
+            sql_cell =  " cell_id='" + cell.cell_id + "'" 
             sql_cycle = " and cycle_index>=" + str(start_cycle) + " and cycle_index<=" + str(end_cycle)
             sql_str = text("select * from "+ cell.buffer_table + " where" + sql_cell + sql_cycle + " order by test_time")
             print(sql_str)
@@ -133,7 +131,7 @@ def process(cell:AbstractCell, engine, conn):
 
                 if not df_ts.empty:
                     start_time = time.time()
-                    df_cycle_stats = cell.calc_cycle(df_ts, cell.get_cell_id())
+                    df_cycle_stats = cell.calc_cycle(df_ts, cell.cell_id)
                     df_cycle_timeseries = cell.calc_timeseries(df_ts)
                     print("calc_stats time: " + str(time.time() - start_time))
                     logging.info("calc_stats time: " + str(time.time() - start_time))
@@ -198,6 +196,15 @@ def get_cycle_index_max(conn, table, id):
     db_conn.close()
     return cycle_index_max
 
+def get_file_type_obj(tester):
+    #make this nicer in future
+    #create __init__ file import once 
+    from arbin import Arbin
+    from matlab import Matlab
+    if tester == 'arbin':
+        return Arbin()
+    elif tester == 'matlab':
+        return Matlab()
 
 def main(argv):
 

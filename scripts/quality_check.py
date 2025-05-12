@@ -3,6 +3,7 @@ import glob
 import pandas as pd
 import yaml
 import sys, getopt
+import scipy as sp
 
 # Copyright 2024 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this software.
 
@@ -35,24 +36,29 @@ def quality_check(file_path):
     for c in cycles:
         rows = df[df[cycle_col]==c]
         no_rows = len(rows.index)
-        if c>510:
-            print(df[current_col])
         try:
             start_row = df.index[df[cycle_col]==c][0]
         except IndexError:
             print('Selected cycle #'+ str(c) + ' is an invalid cycle.')
             continue
         print('\n-----Cycle ' + str(c) + ' with ' + str(no_rows) + ' rows-----')
-        test = 0
+        df_int = pd.DataFrame(columns=['i','time'])
+        c_list = []
+        t_list = []
         for r in range(start_row,start_row + no_rows):
-            if df[capacity_c_col].loc[r] > test:
-                test = df[capacity_c_col].loc[r]
             if df[current_col].loc[r]<0:
                 if df[current_col].loc[r-1]>=0 and r > 0:
                     print('Charge capacity at cycle ' + str(c) + ': ' + str(df[capacity_c_col].loc[r-1]))
                 elif r == start_row+no_rows-1:
                     print('Discharge capacity at cycle ' + str(c) + ': ' + str(df[capacity_d_col].loc[r]))
-        print('max ah_c: '+str(test))
+            else:
+                if c == 7978: 
+                    c_list.append(df[current_col].loc[r])
+                    t_list.append(df['Timestamp'].loc[r])
+        df_int['i'] = c_list
+        df_int['time'] = t_list
+        integrate(df_int)
+
 def file_reader(path, name, sheetname):
     read_func = getattr(pd, name)
     if name=='read_excel':
@@ -63,6 +69,15 @@ def file_reader(path, name, sheetname):
 def read_mapper():
     with open(f'mapper.yaml','r') as f:
         return list(yaml.safe_load_all(f))
+    
+def integrate(df):
+    df_time = pd.DataFrame()
+    df_time['pystamp'] = pd.to_datetime(df['time'])
+    df_time['inttime'] = df_time['pystamp'].astype(int)
+    df_time['inttime'] = df_time['inttime'].div(10**9)
+    df_time['Time [s]'] = df_time['inttime']-df_time['inttime'].iloc[0]
+    out = sp.integrate.simpson(df['i'], df_time['Time [s]'])
+    print('Integrated: ' + str(out/3600))
 
 def main(argv):
     mode = 'env'

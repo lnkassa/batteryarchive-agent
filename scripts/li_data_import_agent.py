@@ -10,6 +10,7 @@ pd.options.mode.chained_assignment = None  # default='warn'
 import matplotlib.pyplot as plt
 import psycopg2
 from sqlalchemy import create_engine, text
+import scipy as sp
 import yaml
 import sys, getopt
 import logging
@@ -64,8 +65,19 @@ def convert_mat_to_df(batch):
     print(df_battery)
     return df_battery
 
+def integrate(df):
+    cur_list = []
+    time_list = []
+    for index, row in df.iterrows():
+        if row['i'] > 0 :
+            cur_list.append(row['i'])
+            time_list.append(row['test_time'])
+    print(cur_list)
+    out = sp.integrate.simpson(cur_list, time_list)
+    print(out)
+    return out/3600
 # unpack the dataframe and calculate quantities used in statistics
-def calc_cycle_quantities(df):
+def calc_cycle_quantities(df, flag):
 
     logging.info('calculate quantities used in statistics')
 
@@ -102,10 +114,14 @@ def calc_cycle_quantities(df):
         last_time = x[0]
         last_i = x[1]
         last_v = x[2]
+        if flag:
+            print(x)
         
     df_tmp = pd.DataFrame(data=tmp_arr[:, [3]], columns=["ah_c"])
     df_tmp.index += df.index[0]
-    print(df_tmp['ah_c']/3600.0)
+    if flag:
+        print(df_tmp['ah_c'])
+    #print(df_tmp['ah_c']/3600.0)
     #check rows where NAN compare to original data file
     #value makes sense from given current and voltage, integrate
     #why would code throw NAN, ask Irving
@@ -178,7 +194,7 @@ def calc_stats(df_t, ID):
 
     for c_ind in df_c.index:
         x = no_cycles + c_ind - 29
-        print(x)
+        #print(x)
         df_f = df_t[df_t['cycle_index'] == x] ##optimize call
         
         df_f['ah_c'] = 0
@@ -203,9 +219,13 @@ def calc_stats(df_t, ID):
                 df_f_c = df_f[df_f['i'] > 0]
                 df_f_d = df_f[df_f['i'] < 0]
 
-                df_f = calc_cycle_quantities(df_f)
-                if x == 532:
-                    print(df_f)
+                if x == 7978:
+                    #df_f = calc_cycle_quantities(df_f, True)
+                    df_f = integrate(df_f)
+                    #print(df_f)
+                else:
+                    df_f = calc_cycle_quantities(df_f, False)
+                    #df_f = integrate(df_f)
                 df_t['cycle_time'] = df_t['cycle_time'].astype('float64') #to address dtype warning
 
                 df_t.loc[df_t.cycle_index == x, 'cycle_time'] = df_f['cycle_time']
@@ -1088,7 +1108,7 @@ def add_ts_md_cycle(cell_list, conn, save, plot, path, slash):
         try:
             status = check_cell_status(cell_id, conn)
         except psycopg2.OperationalError:
-            print('database is not available')
+            print('Database is not available')
 
         if status=="completed":
             print("skip cell_id: " + cell_id)
@@ -1168,8 +1188,7 @@ def add_ts_md_cycle(cell_list, conn, save, plot, path, slash):
 
                     if not df_ts.empty:
                         start_time = time.time()
-                        df_cycle_stats = calc_stats(df_ts, cell_id)
-                        df_cycle_timeseries = 
+                        df_cycle_stats, df_cycle_timeseries = calc_stats(df_ts, cell_id)
                         print("calc_stats time: " + str(time.time() - start_time))
                         logging.info("calc_stats time: " + str(time.time() - start_time))
 

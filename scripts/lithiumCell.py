@@ -4,7 +4,6 @@
 import logging
 import pandas as pd
 import pathlib
-import os
 
 from abstractCell import AbstractCell
 
@@ -17,8 +16,11 @@ class lithiumCell(AbstractCell):
         self.stats_table = 'cycle_stats'
         self.md = md #metadata from module?
 
+        self.cell_id = self.md['cell_id']
         self.set_file_id()
-        #self.cell_id = id
+        self.set_tester()
+        self.set_file_type()
+        self.set_path()
         #self.parent = parent #if cell is part of module
 
     def set_tester(self):
@@ -26,16 +28,16 @@ class lithiumCell(AbstractCell):
         
     def set_path(self, path):
         self.file_path = pathlib.PurePath(path).joinpath(self.file_id)
-
-    def get_cell_id(self):
-        return self.md['cell_id']
     
     def set_file_id(self):
-        self.file_id = self.md['file_id']
+        self.file_id = self.md['file_id'] #use get functions
     
     def set_file_type(self):
         self.file_type = self.md['file_type']
-   
+    
+    def set_cell_id(self, id):
+        self.cell_id = id
+
     def calc_timeseries(self, df_t):
         df_t['cycle_time'] = 0
         no_cycles = int(df_t['cycle_index'].max())

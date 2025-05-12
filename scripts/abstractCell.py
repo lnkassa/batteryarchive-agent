@@ -19,7 +19,7 @@ class AbstractCell(ABC):
         pass
 
     @abstractmethod
-    def get_cell_id(self):
+    def set_cell_id(self, id):
         return
     
     @abstractmethod

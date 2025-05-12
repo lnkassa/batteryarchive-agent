@@ -10,7 +10,11 @@ class AbstractFileType(ABC):
         self.unit_mult = ''
 
     @abstractmethod
-    def file_to_df():
+    def file_to_df(self):
         #converts file to df 
         #mostly will just use default pd function, but some need more processing (i.e. matlab)
+        pass
+
+    @abstractmethod
+    def datetime_to_testtime(self):
         pass
