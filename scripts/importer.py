@@ -27,6 +27,10 @@ from abstractFileType import AbstractFileType
 #   5) delete old ts
 #   6) add new ts
 
+##QUESTIONS:
+# most logical naming for args?
+
+
 # done 0) find place for column conversion date_time <-> test_time 
 # done 1) update data
 # done 1.5) move column mapping to file type classes
@@ -91,7 +95,7 @@ def add_cell_data(engine, conn, path, md, cells_to_import:list[AbstractCell], *a
         if status=='buffering':
             logging.info('adding files')
             start_time = time.time()
-            df_ts = buffer(cell, get_file_type_obj(cell.tester), *args)
+            df_ts = buffer(cell, get_file_type_obj(cell.tester))
             df_ts.to_sql(cell.buffer_table, con=engine, if_exists='append', chunksize=1000, index=False)
             print("saved=" + cell.cell_id + " time: " + str(time.time() - start_time))
             start_time = time.time()
@@ -103,8 +107,30 @@ def add_cell_data(engine, conn, path, md, cells_to_import:list[AbstractCell], *a
         clear_buffer(id, cell.buffer_table, conn, id_type='cell_id')
 
 def update_cell_data(engine, conn, path, md, cells_to_import:list[AbstractCell]):
-    delete_all(conn, cells_to_import, id_type='cell_id')
-    add_cell_data(engine, conn, path, md, cells_to_import)
+    for cell in cells_to_import:
+        id = cell.cell_id
+        status = get_status(id, cell.cell_metadata_table, conn, id_type='cell_id')
+        if status == 'completed':
+            status = 'buffering'
+            set_status(id, cell.cell_metadata_table, conn, status, id_type='cell_id')
+            pass
+        if status == 'new':
+            add_cell_data(engine, conn, path, md, cells_to_import)
+        if status == 'buffering':
+            logging.info('adding files')
+            start_time = time.time()
+            df_ts = buffer(cell, get_file_type_obj(cell.tester))
+            df_ts.to_sql(cell.buffer_table, con=engine, if_exists='append', chunksize=1000, index=False)
+            print("saved=" + cell.cell_id + " time: " + str(time.time() - start_time))
+            start_time = time.time()
+            #remove old data
+            delete_data(conn, tables_to_delete=(cell.timeseries_table,cell.stats_table), cells_to_delete=[cell], id_type='cell_id')
+            status='processing'
+            set_status(id, cell.cell_metadata_table, conn, status, id_type='cell_id')
+        if status=='processing':
+            process(cell, engine, conn)
+        set_status(id, cell.cell_metadata_table, conn, status='completed', id_type='cell_id')
+        clear_buffer(id, cell.buffer_table, conn, id_type='cell_id')
 
 def buffer(cell:AbstractCell, file_type_obj:AbstractFileType):
     #if file type
@@ -241,15 +267,13 @@ def get_file_type_obj(tester):
     if tester == 'generic': ##this is not ideal, but all previous metadata uses 'generic'
         return UCONN()
 
-def delete_all(conn, cells_to_delete:list[AbstractCell], id_type):
+def delete_data(conn, tables_to_delete:list, cells_to_delete:list[AbstractCell], id_type:str):
     print('Deleting...')
     all_strs = ''
     for cell in cells_to_delete:
-        for var, value in vars(cell).items():
-            if var.endswith('_table'):
-                table = value
-                sql_str = "delete from " + table + " where " + id_type + "='" + cell.cell_id + "';\n"
-                all_strs = all_strs + sql_str
+        for table in tables_to_delete:
+            sql_str = "delete from " + table + " where " + id_type + "='" + cell.cell_id + "';\n"
+            all_strs = all_strs + sql_str
     print(all_strs)
     db_conn = psycopg2.connect(conn)
     curs = db_conn.cursor()

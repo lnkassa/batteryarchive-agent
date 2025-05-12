@@ -20,7 +20,7 @@ class LithiumCell(AbstractCell):
         self.set_file_id()
         self.set_tester()
         self.set_file_type()
-        #self.set_path()
+        self.set_path(path)
         #self.parent = parent #if cell is part of module
 
     def set_tester(self):
@@ -119,8 +119,10 @@ class LithiumCell(AbstractCell):
             
             if not df_f.empty:
                 try:
+                    df_f['dt'] = df_f['test_time'].diff() / 3600.0
                     df_f_c = df_f[df_f['i'] > 0]
                     df_f_d = df_f[df_f['i'] < 0]
+                    df_f = self.calc_cycle_quantities(df_f)
                     df_c.iloc[c_ind, df_c.columns.get_loc('cycle_index')] = x
                     df_c.iloc[c_ind, df_c.columns.get_loc('v_max')] = df_f.loc[df_f['v'].idxmax()].v
                     df_c.iloc[c_ind, df_c.columns.get_loc('v_min')] = df_f.loc[df_f['v'].idxmin()].v
