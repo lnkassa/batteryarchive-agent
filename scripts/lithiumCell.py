@@ -69,13 +69,12 @@ class LithiumCell(AbstractCell):
         return df_tt
     
     def calc_cycle(self, df_t, ID):
-        print('first1!1')
         logging.info('calculate cycle time and cycle statistics')
         no_cycles = int(df_t['cycle_index'].max())
         # Initialize the cycle_data time frame
         a = [x for x in range(no_cycles-30, no_cycles)]  # using loops
         df_c = pd.DataFrame(data=a, columns=["cycle_index"]) 
-    
+
         df_c['cell_id'] = ID
         df_c['cycle_index'] = 0
         df_c['v_max'] = 0
@@ -117,15 +116,13 @@ class LithiumCell(AbstractCell):
             df_f['ah_d'] = 0
             df_f['e_d'] = 0
             
-            print(df_f.empty)
             if not df_f.empty:
-                print('not empty')
                 try:
                     df_f['dt'] = df_f['test_time'].diff() / 3600.0
                     df_f_c = df_f[df_f['i'] > 0]
                     df_f_d = df_f[df_f['i'] < 0]
+
                     df_f = self.calc_cycle_quantities(df_f)
-                    print('here')
                     df_c.iloc[c_ind, df_c.columns.get_loc('cycle_index')] = x
                     df_c.iloc[c_ind, df_c.columns.get_loc('v_max')] = df_f.loc[df_f['v'].idxmax()].v
                     df_c.iloc[c_ind, df_c.columns.get_loc('v_min')] = df_f.loc[df_f['v'].idxmin()].v
@@ -161,7 +158,6 @@ class LithiumCell(AbstractCell):
         return df_cc
     
     def calc_cycle_quantities(self, df):
-        print('eee')
         logging.info('calculate quantities used in statistics')
 
         tmp_arr = df[["test_time", "i", "v", "ah_c", 'e_c', 'ah_d', 'e_d', 'cycle_time']].to_numpy()

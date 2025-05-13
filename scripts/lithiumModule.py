@@ -9,7 +9,7 @@ from abstractModule import AbstractModule
 from lithiumCell import LithiumCell
 
 class LithiumModule(AbstractModule):
-    def __init__(self, md):
+    def __init__(self, path, md):
         self.module_metadata_table = 'module_metadata'
         self.cycle_metadata_table = 'cycle_metadata'
         self.timeseries_table = 'cycle_timeseries'
@@ -22,6 +22,7 @@ class LithiumModule(AbstractModule):
         self.set_file_id()
         self.set_tester()
         self.set_file_type()
+        self.set_path(path)
     
 
     def set_tester(self):

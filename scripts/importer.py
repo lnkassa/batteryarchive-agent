@@ -28,11 +28,10 @@ from abstractFileType import AbstractFileType
 # 4) add additional file types
 # 5) create __init__ and package
 # 5) docstrings and types
-def add_module_data(engine, conn, path, md, modules_to_import:list[AbstractModule]):
+def add_module_data(engine, conn:str, modules_to_import:list[AbstractModule]):
     #1) import module metadata
     for ind, module in enumerate(modules_to_import):
         id = module.module_id
-        module.set_path(path)
 
         print(module.md)
         module_md, cell_md = module.populate_metadata()
@@ -47,21 +46,20 @@ def add_module_data(engine, conn, path, md, modules_to_import:list[AbstractModul
         if status=='new':
             logging.info('save module metadata')
             module_md.to_sql(module.module_metadata_table, con=engine, if_exists='append', chunksize=1000, index=False)
-            cells_to_import = [module.child_type(path,row) for ind, row in cell_md.iterrows()]
+            cells_to_import = [module.child_type(module.file_path,row) for ind, row in cell_md.iterrows()]
             #need to convert module to cell ts first
-            add_cell_data(engine, conn, path, cell_md, cells_to_import)
+            add_cell_data(engine, conn, cell_md, cells_to_import)
     #2) convert module format to cell
     #3) import cell data (call add_cell_data)
     return
 
-def add_cell_data(engine, conn, path, md, cells_to_import:list[AbstractCell], *args): 
+def add_cell_data(engine, conn:str, cells_to_import:list[AbstractCell]): 
     #adds data to database
     #logging
     for ind, cell in enumerate(cells_to_import):
         id = cell.cell_id
         cell.set_file_id()
         cell.set_file_type()
-        cell.set_path(path)
         cell.set_tester()
     
         print(cell.md) #print current cell metadata
@@ -95,7 +93,7 @@ def add_cell_data(engine, conn, path, md, cells_to_import:list[AbstractCell], *a
         set_status(id, cell.cell_metadata_table, conn, status='completed', id_type='cell_id')
         clear_buffer(id, cell.buffer_table, conn, id_type='cell_id')
 
-def update_cell_data(engine, conn, path, md, cells_to_import:list[AbstractCell]):
+def update_cell_data(engine, conn:str, cells_to_import:list[AbstractCell]):
     for cell in cells_to_import:
         id = cell.cell_id
         status = get_status(id, cell.cell_metadata_table, conn, id_type='cell_id')
@@ -103,7 +101,7 @@ def update_cell_data(engine, conn, path, md, cells_to_import:list[AbstractCell])
             status = 'buffering'
             set_status(id, cell.cell_metadata_table, conn, status, id_type='cell_id')
         if status == 'new':
-            add_cell_data(engine, conn, path, md, cells_to_import)
+            add_cell_data(engine, conn, cells_to_import)
         if status == 'buffering':
             logging.info('adding files')
             start_time = time.time()
@@ -155,7 +153,7 @@ def buffer(cell:AbstractCell, file_type_obj:AbstractFileType):
             print("processing:" + sheetname)
     return df_ts
 
-def process(cell:AbstractCell, engine, conn):
+def process(cell:AbstractCell, engine, conn:str):
     chunk_size = 30 #number of cells to process at once
     cycle_index_max = get_cycle_index_max(conn, cell.buffer_table, cell.cell_id)
     cycle_stats_index_max = get_cycle_index_max(conn, cell.stats_table, cell.cell_id)
@@ -191,7 +189,7 @@ def process(cell:AbstractCell, engine, conn):
                     print("save timeseries time: " + str(time.time() - start_time))
                     logging.info("save timeseries time: " + str(time.time() - start_time))
 
-def clear_buffer(id, buffer_table, conn, id_type=''):
+def clear_buffer(id, buffer_table, conn:str, id_type=''):
     # this method will delete data for a cell_id. Use with caution as there is no undo
     db_conn = psycopg2.connect(conn)
     curs = db_conn.cursor()
@@ -201,7 +199,7 @@ def clear_buffer(id, buffer_table, conn, id_type=''):
     db_conn.close()
     return
 
-def get_status(id, md_table, conn, id_type):
+def get_status(id:str, md_table:str, conn:str, id_type:str):
     sql_str = "select status from " + md_table + " where " + id_type + "= '" + id + "'"
     db_conn = psycopg2.connect(conn)
     curs = db_conn.cursor()
@@ -215,7 +213,7 @@ def get_status(id, md_table, conn, id_type):
     print('cell status is: ' + status)
     return status
 
-def set_status(id, md_table, conn, status, id_type=''):
+def set_status(id:str, md_table:str, conn:str, status:str, id_type=''):
     sql_str = "update " + md_table + " set status = '" + status + "' where " + id_type + "= '" + id + "'"
     db_conn = psycopg2.connect(conn)
     curs = db_conn.cursor()
@@ -225,7 +223,7 @@ def set_status(id, md_table, conn, status, id_type=''):
     db_conn.close()
     return
 
-def get_cycle_index_max(conn, table, id):
+def get_cycle_index_max(conn:str, table:str, id:str):
     #gets max cycle from database
     sql_str = "select max(cycle_index)::int as max_cycles from " + table + " where cell_id = '" + id + "'"
     db_conn = psycopg2.connect(conn)
@@ -241,7 +239,7 @@ def get_cycle_index_max(conn, table, id):
     db_conn.close()
     return cycle_index_max
 
-def get_file_type_obj(tester):
+def get_file_type_obj(tester:str):
     #make this nicer in future
     #create __init__ file import once 
     from arbin import Arbin
@@ -254,7 +252,7 @@ def get_file_type_obj(tester):
     if tester == 'generic': ##this is not ideal, but all previous metadata uses 'generic'
         return UCONN()
 
-def delete_data(conn, tables_to_delete:list, cells_to_delete:list[AbstractCell], id_type:str):
+def delete_data(conn:str, tables_to_delete:list[str], cells_to_delete:list[AbstractCell], id_type:str):
     print('Deleting...')
     all_strs = ''
     for cell in cells_to_delete:
@@ -324,6 +322,7 @@ def main(argv):
     if conn == '':
         conn = data['environment']['DATABASE_CONNECTION']
 
+
     logging.info('command line: ' + str(opts))
     logging.info('configuration: ' + str(data))
 
@@ -337,16 +336,16 @@ def main(argv):
         md = pd.read_excel(pathlib.PurePath(path).joinpath("cell_list.xlsx"))
         cells_to_import = [LithiumCell(path,row) for ind, row in md.iterrows()]
         if import_type == 'add':
-            add_cell_data(engine, conn, path, md, cells_to_import)
+            add_cell_data(engine, conn, cells_to_import)
         elif import_type == 'update':
-            update_cell_data(engine, conn, path, md, cells_to_import)
+            update_cell_data(engine, conn, cells_to_import)
     # elif data_type == 'flow-cell':
     #     df_md = pd.read_excel(os.path.join(path, '') + "cell_list.xlsx")
     #     imp = flowCell(df_md)
     elif data_type == 'li-module':
         md = pd.read_excel(pathlib.PurePath(path).joinpath("module_list.xlsx"))
-        modules_to_import = [LithiumModule(row) for ind, row in md.iterrows()]
-        add_module_data(engine, conn, path, md, modules_to_import)
+        modules_to_import = [LithiumModule(path, row) for ind, row in md.iterrows()]
+        add_module_data(engine, conn, modules_to_import)
     return
 
 if __name__ == "__main__":

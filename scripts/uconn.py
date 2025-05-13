@@ -30,3 +30,4 @@ class UCONN(AbstractFileType):
         df_tt['inttime'] = df_tt['pystamp'].astype(int)
         df_tt['inttime'] = df_tt['inttime'].div(10**9)
         df_tt['Time [s]'] = df_tt['inttime']-df_tt['inttime'].iloc[0]
+        return df_tt['Time [s]']
