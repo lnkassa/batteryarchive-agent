@@ -191,7 +191,7 @@ def calc_stats(df_t, ID):
             }
  
     df_c = df_c.astype(convert_dict)
-
+    print(df_c.index)
     for c_ind in df_c.index:
         x = no_cycles + c_ind - 29
         #print(x)

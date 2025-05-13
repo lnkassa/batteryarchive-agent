@@ -15,7 +15,14 @@ class UCONN(AbstractFileType):
         self.unit_mult = {'A' : 1, 'V' : 1, 's' : 1}
 
     def file_to_df(self, path):
-        pass
+        read_func = getattr(pd, self.reader_func)
+        if self.reader_func=='read_excel': #is there a better way to choose this if needed?
+            df_ts_file = read_func(path, None)
+            for sheet in df_ts_file.keys():
+                if 'channel' in sheet.lower():
+                    return df_ts_file[sheet], sheet
+        else:
+            return read_func(path), ''
 
     def datetime_to_testtime(self, df):
         df_tt = pd.DataFrame()

@@ -16,17 +16,6 @@ from abstractCell import AbstractCell
 from abstractModule import AbstractModule
 from abstractFileType import AbstractFileType
 
-# update method:
-#   1) delete everything
-#   2) add everything
-# old update method:
-#   1) find cells in db where status == update
-#   2) loop through cells and calculate stats and ts data
-#   3) delete old stats
-#   4) add new stats
-#   5) delete old ts
-#   6) add new ts
-
 ##QUESTIONS:
 # most logical naming for args?
 
@@ -53,7 +42,7 @@ def add_module_data(engine, conn, path, md, modules_to_import:list[AbstractModul
         except psycopg2.OperationalError:
             print('Database is not available.')
         if status=='completed':
-            #logging skipping cell id 
+            #logging skipping module id 
             pass
         if status=='new':
             logging.info('save module metadata')
@@ -113,7 +102,6 @@ def update_cell_data(engine, conn, path, md, cells_to_import:list[AbstractCell])
         if status == 'completed':
             status = 'buffering'
             set_status(id, cell.cell_metadata_table, conn, status, id_type='cell_id')
-            pass
         if status == 'new':
             add_cell_data(engine, conn, path, md, cells_to_import)
         if status == 'buffering':
@@ -151,7 +139,7 @@ def buffer(cell:AbstractCell, file_type_obj:AbstractFileType):
                 if key in file_type_obj.col_mapping:
                     df_ts[key] = df_ts_file[file_type_obj.col_mapping[key]]
                 if 'date_time' == key and 'test_time' not in file_type_obj.col_mapping:
-                    df_ts['test_time'] = file_type_obj.datetime_to_testtime(df_ts_file[key])
+                    df_ts['test_time'] = file_type_obj.datetime_to_testtime(df_ts_file)
                 elif 'test_time' not in file_type_obj.col_mapping and 'date_time' not in file_type_obj.col_mapping:#change to check if all necessary columns exist
                     #exit code
                     print('There is no time data in the timeseries file.')
@@ -164,8 +152,7 @@ def buffer(cell:AbstractCell, file_type_obj:AbstractFileType):
 
         except KeyError as e:
             print("I got a KeyError - reason " + str(e))
-            print("processing:" + sheetname + " time: " + str(time.time() - start_time))
-            start_time = time.time()
+            print("processing:" + sheetname)
     return df_ts
 
 def process(cell:AbstractCell, engine, conn):
@@ -346,7 +333,6 @@ def main(argv):
     from lithiumCell import LithiumCell
     from lithiumModule import LithiumModule
 
-    # mod_flag=False
     if data_type == 'li-cell':
         md = pd.read_excel(pathlib.PurePath(path).joinpath("cell_list.xlsx"))
         cells_to_import = [LithiumCell(path,row) for ind, row in md.iterrows()]
