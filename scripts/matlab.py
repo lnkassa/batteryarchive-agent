@@ -2,12 +2,23 @@
 # Copyright 2025 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this software.
 
 import numpy as np
+import pandas as pd
+import h5py
 
 from abstractFileType import AbstractFileType
 
 class Matlab(AbstractFileType):
+    def __init__(self):
+        self.tester =  'matlab'
+        self.reader_func = ''
+        self.col_mapping = {'cycle_index' : 'cycle_number',
+                            'test_time' : 't',
+                            'i' : 'I',
+                            'v' : 'V'}
 
-    def file_to_df():
+    def file_to_df(self, cellpath):
+        f = h5py.File(cellpath)
+        batch = f['batch']
         num_cells = batch['summary'].shape[0]
         bat_dict = {}
         for i in range(num_cells):
@@ -37,8 +48,8 @@ class Matlab(AbstractFileType):
             key = 'b3c' + str(i)
             bat_dict[key] = cell_dict
             
-        print(df_battery)
-        return df_battery
+        #print(df_battery)
+        return df_battery, ''
     
     def datetime_to_testtime(self):
         return super().datetime_to_testtime()

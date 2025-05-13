@@ -8,7 +8,7 @@ pd.options.mode.chained_assignment = None  # default='warn'
 import pathlib
 import psycopg2
 import sys, getopt
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, Engine
 import time
 import yaml
 
@@ -28,7 +28,7 @@ from abstractFileType import AbstractFileType
 # 4) add additional file types
 # 5) create __init__ and package
 # 5) docstrings and types
-def add_module_data(engine, conn:str, modules_to_import:list[AbstractModule]):
+def add_module_data(engine:Engine, conn:str, modules_to_import:list[AbstractModule]):
     #1) import module metadata
     for ind, module in enumerate(modules_to_import):
         id = module.module_id
@@ -53,7 +53,7 @@ def add_module_data(engine, conn:str, modules_to_import:list[AbstractModule]):
     #3) import cell data (call add_cell_data)
     return
 
-def add_cell_data(engine, conn:str, cells_to_import:list[AbstractCell]): 
+def add_cell_data(engine:Engine, conn:str, cells_to_import:list[AbstractCell]): 
     #adds data to database
     #logging
     for ind, cell in enumerate(cells_to_import):
@@ -120,6 +120,7 @@ def update_cell_data(engine, conn:str, cells_to_import:list[AbstractCell]):
 
 def buffer(cell:AbstractCell, file_type_obj:AbstractFileType):
     #if file type
+    print('Buffering...')
     list_ts_fldr = [file for file in pathlib.Path(cell.file_path).glob('./*')]
     #check if enough files exist (more than 1)
     for i in range(len(list_ts_fldr)):
@@ -153,7 +154,7 @@ def buffer(cell:AbstractCell, file_type_obj:AbstractFileType):
             print("processing:" + sheetname)
     return df_ts
 
-def process(cell:AbstractCell, engine, conn:str):
+def process(cell:AbstractCell, engine:Engine, conn:str):
     chunk_size = 30 #number of cells to process at once
     cycle_index_max = get_cycle_index_max(conn, cell.buffer_table, cell.cell_id)
     cycle_stats_index_max = get_cycle_index_max(conn, cell.stats_table, cell.cell_id)
@@ -189,7 +190,7 @@ def process(cell:AbstractCell, engine, conn:str):
                     print("save timeseries time: " + str(time.time() - start_time))
                     logging.info("save timeseries time: " + str(time.time() - start_time))
 
-def clear_buffer(id, buffer_table, conn:str, id_type=''):
+def clear_buffer(id:str, buffer_table:str, conn:str, id_type:str):
     # this method will delete data for a cell_id. Use with caution as there is no undo
     db_conn = psycopg2.connect(conn)
     curs = db_conn.cursor()
@@ -213,7 +214,7 @@ def get_status(id:str, md_table:str, conn:str, id_type:str):
     print('cell status is: ' + status)
     return status
 
-def set_status(id:str, md_table:str, conn:str, status:str, id_type=''):
+def set_status(id:str, md_table:str, conn:str, status:str, id_type:str):
     sql_str = "update " + md_table + " set status = '" + status + "' where " + id_type + "= '" + id + "'"
     db_conn = psycopg2.connect(conn)
     curs = db_conn.cursor()
@@ -249,10 +250,11 @@ def get_file_type_obj(tester:str):
         return Arbin()
     elif tester == 'matlab':
         return Matlab()
-    if tester == 'generic': ##this is not ideal, but all previous metadata uses 'generic'
+    elif tester == 'generic': ##this is not ideal, but all previous metadata uses 'generic'
         return UCONN()
 
 def delete_data(conn:str, tables_to_delete:list[str], cells_to_delete:list[AbstractCell], id_type:str):
+    # this method will delete data for a cell_id. Use with caution as there is no undo
     print('Deleting...')
     all_strs = ''
     for cell in cells_to_delete:
@@ -267,7 +269,7 @@ def delete_data(conn:str, tables_to_delete:list[str], cells_to_delete:list[Abstr
     curs.close()
     db_conn.close()
 
-def main(argv):
+def main(argv:list[str]):
 
     # command line variables that can be used to run from an IDE without passing arguments
     mode = 'env'
