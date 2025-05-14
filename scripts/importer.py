@@ -12,9 +12,9 @@ from sqlalchemy import create_engine, text, Engine
 import time
 import yaml
 
-from abstractCell import AbstractCell
-from abstractModule import AbstractModule
-from abstractFileType import AbstractFileType
+import 
+# import batteryarchiveagent as ba
+
 
 ##QUESTIONS:
 # most logical naming for args?
@@ -28,7 +28,7 @@ from abstractFileType import AbstractFileType
 # 5) create __init__ and package
 # 5) docstrings and types
 # 6) test for typical errors ('break' code intentionally) and improve speed/efficiency
-def add_module_data(engine:Engine, conn:str, modules_to_import:list[AbstractModule]): #for modules and stacks
+def add_module_data(engine:Engine, conn:str, modules_to_import:list[ba.AbstractModule]): #for modules and stacks
     #1) import module metadata
     for ind, module in enumerate(modules_to_import):
         id = module.module_id
