@@ -3,16 +3,24 @@
 import pathlib
 import pandas as pd
 import logging
+from sqlalchemy import Engine, text
 
 from abstractCell import AbstractCell
 
 class FlowCell(AbstractCell):
-    def __init__(self):
+    def __init__(self, path, md):
         self.cell_metadata_table = 'flow_cell_metadata'
         self.cycle_metadata_table = 'flow_cycle_metadata'
         self.timeseries_table = 'flow_cycle_timeseries'
         self.buffer_table = 'flow_cycle_timeseries_buffer'
         self.stats_table = 'flow_cycle_stats'
+        self.md = md
+
+        self.cell_id = self.md['cell_id']
+        self.set_file_id()
+        self.set_tester()
+        self.set_file_type()
+        self.set_path(path)
     
     def set_tester(self):
         self.tester = self.md['tester']
@@ -57,7 +65,7 @@ class FlowCell(AbstractCell):
         df_tt = df_t[df_t['cycle_index'] > 0]
         return df_tt
 
-    def calc_cycle(self, df_t, ID):
+    def calc_cycle(self, df_t, engine):
         logging.info('calculate cycle time and cycle statistics')
         df_t['cycle_time'] = 0
         no_cycles = int(df_t['cycle_index'].max())
@@ -66,7 +74,7 @@ class FlowCell(AbstractCell):
         df_c = pd.DataFrame(data=a, columns=["cycle_index"]) 
         
         #'cmltv' = 'cumulative'
-        df_c['cell_id'] = ID
+        df_c['cell_id'] = self.cell_id
         df_c['cycle_index'] = 0
         df_c['v_max'] = 0
         df_c['i_max'] = 0
@@ -76,11 +84,12 @@ class FlowCell(AbstractCell):
         df_c['ah_d'] = 0
         df_c['e_c'] = 0
         df_c['e_d'] = 0
+        #find better solution for this
         with engine.connect() as conn:
-            init = pd.read_sql("select max(e_c_cmltv) from flow_cycle_stats where cell_id='"+ID+"'", conn).iloc[0,0] #for continuity btwn calc_stats calls
+            init = pd.read_sql(text("select max(e_c_cmltv) from " + self.stats_table + " where cell_id='"+self.cell_id+"'"), conn).iloc[0,0] #for continuity btwn calc_stats calls
             init = 0 if init == None else init
             df_c['e_c_cmltv'] = init 
-            init = pd.read_sql("select max(e_d_cmltv) from flow_cycle_stats where cell_id='"+ID+"'", conn).iloc[0,0]
+            init = pd.read_sql(text("select max(e_d_cmltv) from " + self.stats_table + " where cell_id='"+self.cell_id+"'"), conn).iloc[0,0]
             init = 0 if init == None else init
         df_c['e_d_cmltv'] = init 
         df_c['v_c_mean'] = 0
@@ -168,8 +177,7 @@ class FlowCell(AbstractCell):
         df_cc = df_c[df_c['cycle_index'] > 0]
         return df_cc
     
-    def calc_cycle_quantities(df):
-
+    def calc_cycle_quantities(self, df):
         logging.info('calculate quantities used in statistics')
 
         tmp_arr = df[["test_time", "i", "v", "ah_c", 'e_c', 'ah_d', 'e_d', 'cycle_time']].to_numpy()
@@ -231,4 +239,27 @@ class FlowCell(AbstractCell):
         return df
 
     def populate_metadata(self): 
-        return
+        # Build cell metadata
+        df_cell_md = pd.DataFrame()
+        df_cell_md['cell_id'] = [self.md['cell_id']]
+        df_cell_md['flow_pattern'] = [self.md['flow pattern']]
+        df_cell_md['ne_material'] = [self.md['NE material']]
+        df_cell_md['pe_material'] = [self.md['PE material']]
+        df_cell_md['membrane'] = [self.md['membrane']]
+        df_cell_md['membrane_size'] = [self.md['membrane size (cm2)']]
+        df_cell_md['ne_active'] = [self.md['NE active']]
+        df_cell_md['initial_ne_active'] = [self.md['initial [NE active], M']]
+        df_cell_md['pe_active'] = [self.md['PE active']]
+        df_cell_md['initial_pe_active'] = [self.md['initial [PE active], M']]
+        df_cell_md['ne_volume'] = [self.md['NE volume (L)']]
+        df_cell_md['pe_volume'] = [self.md['PE volume (L)']]  
+        df_cell_md['flow_rate'] = [self.md['flow rate (L/min)']]
+        df_cell_md['test_type'] = [self.md['test type']]
+        #df_cell_md['source'] = [self.md['source']]
+        df_cell_md['test'] = [self.md['test']]
+        df_cell_md['tester'] = [self.md['tester']]
+        
+        # Build cycle metadata - TODO
+        df_cycle_md = pd.DataFrame()
+        
+        return df_cell_md, df_cycle_md

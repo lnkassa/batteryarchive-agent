@@ -68,14 +68,14 @@ class LithiumCell(AbstractCell):
         df_tt = df_t[df_t['cycle_index'] > 0]
         return df_tt
     
-    def calc_cycle(self, df_t, ID):
+    def calc_cycle(self, df_t):
         logging.info('calculate cycle time and cycle statistics')
         no_cycles = int(df_t['cycle_index'].max())
         # Initialize the cycle_data time frame
         a = [x for x in range(no_cycles-30, no_cycles)]  # using loops
         df_c = pd.DataFrame(data=a, columns=["cycle_index"]) 
 
-        df_c['cell_id'] = ID
+        df_c['cell_id'] = self.cell_id
         df_c['cycle_index'] = 0
         df_c['v_max'] = 0
         df_c['i_max'] = 0

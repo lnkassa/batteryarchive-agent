@@ -35,7 +35,7 @@ class AbstractCell(ABC):
         pass
     
     @abstractmethod
-    def calc_cycle(self):
+    def calc_cycle(self, df, *args):
         pass
     
     @abstractmethod

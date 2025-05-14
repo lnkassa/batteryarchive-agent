@@ -121,7 +121,8 @@ def update_cell_data(engine, conn:str, cells_to_import:list[AbstractCell]):
 def buffer(cell:AbstractCell, file_type_obj:AbstractFileType):
     #if file type
     print('Buffering...')
-    list_ts_fldr = [file for file in pathlib.Path(cell.file_path).glob('./*')]
+    # list of timeseries files, excluding hidden files
+    list_ts_fldr = [file for file in pathlib.Path(cell.file_path).glob('./*') if not any(part.startswith('.') for part in file.parts)]
     #check if enough files exist (more than 1)
     for i in range(len(list_ts_fldr)):
         print(list_ts_fldr[i])
@@ -155,6 +156,7 @@ def buffer(cell:AbstractCell, file_type_obj:AbstractFileType):
     return df_ts
 
 def process(cell:AbstractCell, engine:Engine, conn:str):
+    print('Processing...')
     chunk_size = 30 #number of cells to process at once
     cycle_index_max = get_cycle_index_max(conn, cell.buffer_table, cell.cell_id)
     cycle_stats_index_max = get_cycle_index_max(conn, cell.stats_table, cell.cell_id)
@@ -175,18 +177,18 @@ def process(cell:AbstractCell, engine:Engine, conn:str):
 
                 if not df_ts.empty:
                     start_time = time.time()
-                    df_cycle_stats = cell.calc_cycle(df_ts, cell.cell_id)
+                    df_cycle_stats = cell.calc_cycle(df_ts, engine)
                     df_cycle_timeseries = cell.calc_timeseries(df_ts)
                     print("calc_stats time: " + str(time.time() - start_time))
                     logging.info("calc_stats time: " + str(time.time() - start_time))
 
                     start_time = time.time()
-                    df_cycle_stats.to_sql('cycle_stats', con=engine, if_exists='append', chunksize=1000, index=False)
+                    df_cycle_stats.to_sql(cell.stats_table, con=engine, if_exists='append', chunksize=1000, index=False)
                     print("save stats time: " + str(time.time() - start_time))
                     logging.info("save stats time: " + str(time.time() - start_time))
 
                     start_time = time.time()
-                    df_cycle_timeseries.to_sql('cycle_timeseries', con=engine, if_exists='append', chunksize=1000, index=False)
+                    df_cycle_timeseries.to_sql(cell.timeseries_table, con=engine, if_exists='append', chunksize=1000, index=False)
                     print("save timeseries time: " + str(time.time() - start_time))
                     logging.info("save timeseries time: " + str(time.time() - start_time))
 
@@ -333,6 +335,7 @@ def main(argv:list[str]):
     
     from lithiumCell import LithiumCell
     from lithiumModule import LithiumModule
+    from flowCell import FlowCell
 
     if data_type == 'li-cell':
         md = pd.read_excel(pathlib.PurePath(path).joinpath("cell_list.xlsx"))
@@ -341,9 +344,10 @@ def main(argv:list[str]):
             add_cell_data(engine, conn, cells_to_import)
         elif import_type == 'update':
             update_cell_data(engine, conn, cells_to_import)
-    # elif data_type == 'flow-cell':
-    #     df_md = pd.read_excel(os.path.join(path, '') + "cell_list.xlsx")
-    #     imp = flowCell(df_md)
+    elif data_type == 'flow-cell':
+        md = pd.read_excel(pathlib.PurePath(path).joinpath("cell_list.xlsx"))
+        cells_to_import = [FlowCell(path, row) for ind, row in md.iterrows()]
+        add_cell_data(engine, conn, cells_to_import)
     elif data_type == 'li-module':
         md = pd.read_excel(pathlib.PurePath(path).joinpath("module_list.xlsx"))
         modules_to_import = [LithiumModule(path, row) for ind, row in md.iterrows()]
