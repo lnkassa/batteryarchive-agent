@@ -12,9 +12,8 @@ from sqlalchemy import create_engine, text, Engine
 import time
 import yaml
 
-from abstractCell import AbstractCell
-from abstractModule import AbstractModule
-from abstractFileType import AbstractFileType
+import batteryarchive_agent as ba
+
 
 
 ##QUESTIONS:
