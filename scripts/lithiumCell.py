@@ -8,7 +8,7 @@ import pathlib
 from abstractCell import AbstractCell
 
 class LithiumCell(AbstractCell):
-    def __init__(self, path, md):
+    def __init__(self, path:str, md:pd.Series):
         self.cell_metadata_table = 'cell_metadata'
         self.cycle_metadata_table = 'cycle_metadata'
         self.timeseries_table = 'cycle_timeseries'
@@ -26,7 +26,7 @@ class LithiumCell(AbstractCell):
     def set_tester(self):
         self.tester = self.md['tester']
         
-    def set_path(self, path):
+    def set_path(self, path:str):
         self.file_path = pathlib.PurePath(path).joinpath(self.file_id)
     
     def set_file_id(self):
@@ -35,10 +35,10 @@ class LithiumCell(AbstractCell):
     def set_file_type(self):
         self.file_type = self.md['file_type']
     
-    def set_cell_id(self, id):
+    def set_cell_id(self, id:str):
         self.cell_id = id
 
-    def calc_timeseries(self, df_t):
+    def calc_timeseries(self, df_t:pd.DataFrame):
         df_t['cycle_time'] = 0
         no_cycles = int(df_t['cycle_index'].max())
 
@@ -68,7 +68,7 @@ class LithiumCell(AbstractCell):
         df_tt = df_t[df_t['cycle_index'] > 0]
         return df_tt
     
-    def calc_cycle(self, df_t):
+    def calc_cycle(self, df_t:pd.DataFrame, *args):
         logging.info('calculate cycle time and cycle statistics')
         no_cycles = int(df_t['cycle_index'].max())
         # Initialize the cycle_data time frame
@@ -157,7 +157,7 @@ class LithiumCell(AbstractCell):
         df_cc = df_c[df_c['cycle_index'] > 0]
         return df_cc
     
-    def calc_cycle_quantities(self, df):
+    def calc_cycle_quantities(self, df:pd.DataFrame):
         logging.info('calculate quantities used in statistics')
 
         tmp_arr = df[["test_time", "i", "v", "ah_c", 'e_c', 'ah_d', 'e_d', 'cycle_time']].to_numpy()

@@ -16,7 +16,7 @@ class Arbin(AbstractFileType):
                             'v' : 'Voltage(V)'}
         self.unit_mult = {'A' : 1, 'V' : 1, 's' : 1}
         
-    def file_to_df(self, path):
+    def file_to_df(self, path:str) -> tuple[pd.DataFrame, str]:
         read_func = getattr(pd, self.reader_func)
         if self.reader_func=='read_excel': #is there a better way to choose this if needed?
             df_ts_file = read_func(path, None)

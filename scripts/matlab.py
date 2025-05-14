@@ -16,7 +16,7 @@ class Matlab(AbstractFileType):
                             'i' : 'I',
                             'v' : 'V'}
 
-    def file_to_df(self, cellpath):
+    def file_to_df(self, cellpath:str) -> tuple[pd.DataFrame, str]:
         f = h5py.File(cellpath)
         batch = f['batch']
         num_cells = batch['summary'].shape[0]

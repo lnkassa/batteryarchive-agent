@@ -8,7 +8,7 @@ from sqlalchemy import Engine, text
 from abstractCell import AbstractCell
 
 class FlowCell(AbstractCell):
-    def __init__(self, path, md):
+    def __init__(self, path:str, md:pd.Series):
         self.cell_metadata_table = 'flow_cell_metadata'
         self.cycle_metadata_table = 'flow_cycle_metadata'
         self.timeseries_table = 'flow_cycle_timeseries'
@@ -25,7 +25,7 @@ class FlowCell(AbstractCell):
     def set_tester(self):
         self.tester = self.md['tester']
         
-    def set_path(self, path):
+    def set_path(self, path:str):
         self.file_path = pathlib.PurePath(path).joinpath(self.file_id)
     
     def set_file_id(self):
@@ -34,10 +34,10 @@ class FlowCell(AbstractCell):
     def set_file_type(self):
         self.file_type = self.md['file_type']
     
-    def set_cell_id(self, id):
+    def set_cell_id(self, id:str):
         self.cell_id = id
    
-    def calc_timeseries(self, df_t):
+    def calc_timeseries(self, df_t:pd.DataFrame):
         df_t['cycle_time'] = 0
         no_cycles = int(df_t['cycle_index'].max())
         for c_ind in pd.RangeIndex(30):
@@ -65,7 +65,7 @@ class FlowCell(AbstractCell):
         df_tt = df_t[df_t['cycle_index'] > 0]
         return df_tt
 
-    def calc_cycle(self, df_t, engine):
+    def calc_cycle(self, df_t:pd.DataFrame, engine:Engine):
         logging.info('calculate cycle time and cycle statistics')
         df_t['cycle_time'] = 0
         no_cycles = int(df_t['cycle_index'].max())
@@ -177,7 +177,7 @@ class FlowCell(AbstractCell):
         df_cc = df_c[df_c['cycle_index'] > 0]
         return df_cc
     
-    def calc_cycle_quantities(self, df):
+    def calc_cycle_quantities(self, df:pd.DataFrame):
         logging.info('calculate quantities used in statistics')
 
         tmp_arr = df[["test_time", "i", "v", "ah_c", 'e_c', 'ah_d', 'e_d', 'cycle_time']].to_numpy()

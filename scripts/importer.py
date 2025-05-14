@@ -19,16 +19,16 @@ from abstractFileType import AbstractFileType
 ##QUESTIONS:
 # most logical naming for args?
 
-
 # done 0) find place for column conversion date_time <-> test_time 
 # done 1) update data
 # done 1.5) move column mapping to file type classes
 # 2) add module data
-# 3) add flow cells
-# 4) add additional file types
+# done 3) add flow cells
+# 4) add additional file types (arbin, matlab, generic-uconn)
 # 5) create __init__ and package
 # 5) docstrings and types
-def add_module_data(engine:Engine, conn:str, modules_to_import:list[AbstractModule]):
+# 6) test for typical errors ('break' code intentionally) and improve speed/efficiency
+def add_module_data(engine:Engine, conn:str, modules_to_import:list[AbstractModule]): #for modules and stacks
     #1) import module metadata
     for ind, module in enumerate(modules_to_import):
         id = module.module_id
@@ -51,7 +51,6 @@ def add_module_data(engine:Engine, conn:str, modules_to_import:list[AbstractModu
             add_cell_data(engine, conn, cell_md, cells_to_import)
     #2) convert module format to cell
     #3) import cell data (call add_cell_data)
-    return
 
 def add_cell_data(engine:Engine, conn:str, cells_to_import:list[AbstractCell]): 
     #adds data to database
@@ -118,7 +117,7 @@ def update_cell_data(engine, conn:str, cells_to_import:list[AbstractCell]):
         set_status(id, cell.cell_metadata_table, conn, status='completed', id_type='cell_id')
         clear_buffer(id, cell.buffer_table, conn, id_type='cell_id')
 
-def buffer(cell:AbstractCell, file_type_obj:AbstractFileType):
+def buffer(cell:AbstractCell, file_type_obj:AbstractFileType) -> pd.DataFrame:
     #if file type
     print('Buffering...')
     # list of timeseries files, excluding hidden files
@@ -200,9 +199,8 @@ def clear_buffer(id:str, buffer_table:str, conn:str, id_type:str):
     db_conn.commit()
     curs.close()
     db_conn.close()
-    return
 
-def get_status(id:str, md_table:str, conn:str, id_type:str):
+def get_status(id:str, md_table:str, conn:str, id_type:str) -> str:
     sql_str = "select status from " + md_table + " where " + id_type + "= '" + id + "'"
     db_conn = psycopg2.connect(conn)
     curs = db_conn.cursor()
@@ -224,9 +222,8 @@ def set_status(id:str, md_table:str, conn:str, status:str, id_type:str):
     db_conn.commit()
     curs.close()
     db_conn.close()
-    return
 
-def get_cycle_index_max(conn:str, table:str, id:str):
+def get_cycle_index_max(conn:str, table:str, id:str) -> int:
     #gets max cycle from database
     sql_str = "select max(cycle_index)::int as max_cycles from " + table + " where cell_id = '" + id + "'"
     db_conn = psycopg2.connect(conn)
@@ -242,7 +239,7 @@ def get_cycle_index_max(conn:str, table:str, id:str):
     db_conn.close()
     return cycle_index_max
 
-def get_file_type_obj(tester:str):
+def get_file_type_obj(tester:str) -> AbstractFileType:
     #make this nicer in future
     #create __init__ file import once 
     from arbin import Arbin

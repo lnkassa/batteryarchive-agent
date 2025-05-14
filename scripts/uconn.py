@@ -14,7 +14,7 @@ class UCONN(AbstractFileType):
                             'v' : 'Voltage (V)'}
         self.unit_mult = {'A' : 1, 'V' : 1, 's' : 1}
 
-    def file_to_df(self, path):
+    def file_to_df(self, path:str) -> tuple[pd.DataFrame, str]:
         read_func = getattr(pd, self.reader_func)
         if self.reader_func=='read_excel': #is there a better way to choose this if needed?
             df_ts_file = read_func(path, None)
@@ -24,7 +24,7 @@ class UCONN(AbstractFileType):
         else:
             return read_func(path), ''
 
-    def datetime_to_testtime(self, df):
+    def datetime_to_testtime(self, df:pd.DataFrame) -> pd.Series:
         df_tt = pd.DataFrame()
         df_tt['pystamp'] = pd.to_datetime(df[self.col_mapping['date_time']])
         df_tt['inttime'] = df_tt['pystamp'].astype(int)
