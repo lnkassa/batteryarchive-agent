@@ -1,11 +1,11 @@
 from abstractCell import AbstractCell
-import abstractModule
-import abstractFileType
+from abstractModule import AbstractModule
+from abstractFileType import AbstractFileType
 
-import lithiumCell
-import flowCell
-import lithiumModule
+from lithiumCell import LithiumCell
+from flowCell import FlowCell
+from lithiumModule import LithiumModule
 
-import arbin
-import matlab
-import uconn
+from arbin import Arbin
+from matlab import Matlab
+from uconn import UCONN
