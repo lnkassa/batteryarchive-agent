@@ -38,7 +38,7 @@ class LithiumCell(AbstractCell):
     def set_cell_id(self, id:str):
         self.cell_id = id
 
-    def calc_timeseries(self, df_t:pd.DataFrame):
+    def calc_timeseries(self, df_t:pd.DataFrame) -> pd.DataFrame:
         df_t['cycle_time'] = 0
         no_cycles = int(df_t['cycle_index'].max())
 
@@ -68,7 +68,7 @@ class LithiumCell(AbstractCell):
         df_tt = df_t[df_t['cycle_index'] > 0]
         return df_tt
     
-    def calc_cycle(self, df_t:pd.DataFrame, *args):
+    def calc_cycle(self, df_t:pd.DataFrame, *args) -> pd.DataFrame:
         logging.info('calculate cycle time and cycle statistics')
         no_cycles = int(df_t['cycle_index'].max())
         # Initialize the cycle_data time frame
@@ -157,7 +157,7 @@ class LithiumCell(AbstractCell):
         df_cc = df_c[df_c['cycle_index'] > 0]
         return df_cc
     
-    def calc_cycle_quantities(self, df:pd.DataFrame):
+    def calc_cycle_quantities(self, df:pd.DataFrame) -> pd.DataFrame:
         logging.info('calculate quantities used in statistics')
 
         tmp_arr = df[["test_time", "i", "v", "ah_c", 'e_c', 'ah_d', 'e_d', 'cycle_time']].to_numpy()
@@ -215,7 +215,7 @@ class LithiumCell(AbstractCell):
         df['cycle_time'] = df_tmp['cycle_time']
         return df
     
-    def populate_metadata(self): 
+    def populate_metadata(self) -> tuple[pd.DataFrame,pd.DataFrame]: 
         # Build cell metadata
         df_cell_md = pd.DataFrame()
         df_cell_md['cell_id'] = [self.md['cell_id']]

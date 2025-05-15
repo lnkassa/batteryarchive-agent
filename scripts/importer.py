@@ -17,17 +17,19 @@ import batteryarchive_agent as ba
 
 ##QUESTIONS:
 # most logical naming for args?
+# come up with standardized names for 'generic' csv
 
 # done 0) find place for column conversion date_time <-> test_time 
 # done 1) update data
 # done 1.5) move column mapping to file type classes
 # 2) add module data
 # done 3) add flow cells
-# 4) add additional file types (arbin, matlab, generic-uconn)
+# 4) add additional file types (arbin, matlab-stanfordTRI, generic-uconn)
 # 5) create __init__ and package
-# 5) docstrings and types
-# 6) test for typical errors ('break' code intentionally) and improve speed/efficiency
-def add_module_stack_data(engine:Engine, conn:str, modules_to_import:list[ba.AbstractModule]): #for modules and stacks
+# 5.5 improve CLI with click
+# 6) docstrings and types
+# 7) test for typical errors ('break' code intentionally) and improve speed/efficiency (create test suite)
+def add_module_stack_data(engine:Engine, conn:str, modules_to_import:list[AbstractModule]): #for modules and stacks
     #1) import module metadata
     for ind, module in enumerate(modules_to_import):
         id = module.module_id
