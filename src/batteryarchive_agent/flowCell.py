@@ -237,7 +237,7 @@ class FlowCell(AbstractCell):
         df['cycle_time'] = df_tmp['cycle_time']
 
         return df
-
+      
     def populate_metadata(self) -> tuple[pd.DataFrame,pd.DataFrame]: 
         # Build cell metadata
         df_cell_md = pd.DataFrame()
