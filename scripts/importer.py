@@ -18,13 +18,14 @@ from abstractFileType import AbstractFileType
 
 ##QUESTIONS:
 # most logical naming for args?
+# come up with standardized names for 'generic' csv
 
 # done 0) find place for column conversion date_time <-> test_time 
 # done 1) update data
 # done 1.5) move column mapping to file type classes
 # 2) add module data
 # done 3) add flow cells
-# 4) add additional file types (arbin, matlab, generic-uconn)
+# 4) add additional file types (arbin, matlab-stanfordTRI, generic-uconn)
 # 5) create __init__ and package
 # 5) docstrings and types
 # 6) test for typical errors ('break' code intentionally) and improve speed/efficiency
@@ -244,13 +245,16 @@ def get_file_type_obj(tester:str) -> AbstractFileType:
     #create __init__ file import once 
     from arbin import Arbin
     from matlab import Matlab
-    from uconn import UCONN
+    from uconn import Uconn
+    from ezbatt import Ezbatt
     if tester == 'arbin':
         return Arbin()
     elif tester == 'matlab':
         return Matlab()
     elif tester == 'generic': ##this is not ideal, but all previous metadata uses 'generic'
-        return UCONN()
+        return Uconn()
+    elif tester == 'csv':
+        return Ezbatt()
 
 def delete_data(conn:str, tables_to_delete:list[str], cells_to_delete:list[AbstractCell], id_type:str):
     # this method will delete data for a cell_id. Use with caution as there is no undo

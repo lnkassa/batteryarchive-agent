@@ -9,7 +9,7 @@ from abstractModule import AbstractModule
 from lithiumCell import LithiumCell
 
 class LithiumModule(AbstractModule):
-    def __init__(self, path, md):
+    def __init__(self, path:str, md:pd.DataFrame):
         self.module_metadata_table = 'module_metadata'
         self.cycle_metadata_table = 'cycle_metadata'
         self.timeseries_table = 'cycle_timeseries'
@@ -28,7 +28,7 @@ class LithiumModule(AbstractModule):
     def set_tester(self):
         self.tester = self.md['tester']
         
-    def set_path(self, path):
+    def set_path(self, path:str):
         self.file_path = pathlib.PurePath(path).joinpath(self.file_id)
     
     def set_file_id(self):
@@ -37,7 +37,7 @@ class LithiumModule(AbstractModule):
     def set_file_type(self):
         self.file_type = self.md['file_type']
 
-    def populate_metadata(self):
+    def populate_metadata(self) -> tuple[pd.DataFrame,pd.DataFrame]:
         # Build module metadata
         df_module_md = pd.DataFrame()
         df_module_md['module_id'] = [self.md['module_id']]
@@ -58,7 +58,7 @@ class LithiumModule(AbstractModule):
         print(df_cell_md) #temp for testing
         return df_module_md, df_cell_md
     
-    def create_cell_df(self, path, row):
+    def create_cell_df(self, path:str, row) -> pd.DataFrame:
         #creates timeseries dataframe for a single cell from the module data timeseries excel file
         data_files = glob.glob(os.path.join(path, f"*.xlsx"))
         data_files = [file for file in data_files if not self.configuration_file and "~$" not in os.path.basename(file)]
