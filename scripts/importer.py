@@ -24,12 +24,12 @@ import batteryarchive_agent as ba
 # done 1.5) move column mapping to file type classes
 # 2) add module data
 # done 3) add flow cells
-# 4) add additional file types (arbin, matlab-stanfordTRI, generic-uconn)
-# 5) create __init__ and package
+# done 4) add additional file types (arbin, matlab-stanfordTRI, generic-uconn)
+# done 5) create __init__ and package
 # 5.5 improve CLI with click
 # 6) docstrings and types
 # 7) test for typical errors ('break' code intentionally) and improve speed/efficiency (create test suite)
-def add_module_stack_data(engine:Engine, conn:str, modules_to_import:list[AbstractModule]): #for modules and stacks
+def add_module_stack_data(engine:Engine, conn:str, modules_to_import:list[ba.AbstractModule]): #for modules and stacks
     #1) import module metadata
     for ind, module in enumerate(modules_to_import):
         id = module.module_id
@@ -242,13 +242,16 @@ def get_cycle_index_max(conn:str, table:str, id:str) -> int:
 
 def get_file_type_obj(tester:str) -> ba.AbstractFileType:
     #make this nicer in future
-    #create __init__ file import once 
     if tester == 'arbin':
         return ba.Arbin()
     elif tester == 'matlab':
         return ba.Matlab()
     elif tester == 'generic': ##this is not ideal, but all previous metadata uses 'generic'
-        return ba.UCONN()
+        return ba.Uconn()
+    elif tester == 'csv':
+        return ba.Ezbatt()
+    elif tester == 'voltaiq':
+        return ba.Maccor()
 
 def delete_data(conn:str, tables_to_delete:list[str], cells_to_delete:list[ba.AbstractCell], id_type:str):
     # this method will delete data for a cell_id. Use with caution as there is no undo

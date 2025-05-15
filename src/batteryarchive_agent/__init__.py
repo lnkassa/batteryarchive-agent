@@ -8,4 +8,6 @@ from lithiumModule import LithiumModule
 
 from arbin import Arbin
 from matlab import Matlab
-from uconn import UCONN
+from uconn import Uconn
+from ezbatt import Ezbatt
+from maccor import Maccor
