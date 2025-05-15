@@ -12,8 +12,7 @@ from sqlalchemy import create_engine, text, Engine
 import time
 import yaml
 
-import 
-# import batteryarchiveagent as ba
+import batteryarchive_agent as ba
 
 
 ##QUESTIONS:
@@ -28,7 +27,7 @@ import
 # 5) create __init__ and package
 # 5) docstrings and types
 # 6) test for typical errors ('break' code intentionally) and improve speed/efficiency
-def add_module_data(engine:Engine, conn:str, modules_to_import:list[ba.AbstractModule]): #for modules and stacks
+def add_module_stack_data(engine:Engine, conn:str, modules_to_import:list[ba.AbstractModule]): #for modules and stacks
     #1) import module metadata
     for ind, module in enumerate(modules_to_import):
         id = module.module_id
@@ -52,7 +51,7 @@ def add_module_data(engine:Engine, conn:str, modules_to_import:list[ba.AbstractM
     #2) convert module format to cell
     #3) import cell data (call add_cell_data)
 
-def add_cell_data(engine:Engine, conn:str, cells_to_import:list[AbstractCell]): 
+def add_cell_data(engine:Engine, conn:str, cells_to_import:list[ba.AbstractCell]): 
     #adds data to database
     #logging
     for ind, cell in enumerate(cells_to_import):
@@ -92,7 +91,7 @@ def add_cell_data(engine:Engine, conn:str, cells_to_import:list[AbstractCell]):
         set_status(id, cell.cell_metadata_table, conn, status='completed', id_type='cell_id')
         clear_buffer(id, cell.buffer_table, conn, id_type='cell_id')
 
-def update_cell_data(engine, conn:str, cells_to_import:list[AbstractCell]):
+def update_cell_data(engine, conn:str, cells_to_import:list[ba.AbstractCell]):
     for cell in cells_to_import:
         id = cell.cell_id
         status = get_status(id, cell.cell_metadata_table, conn, id_type='cell_id')
@@ -117,7 +116,7 @@ def update_cell_data(engine, conn:str, cells_to_import:list[AbstractCell]):
         set_status(id, cell.cell_metadata_table, conn, status='completed', id_type='cell_id')
         clear_buffer(id, cell.buffer_table, conn, id_type='cell_id')
 
-def buffer(cell:AbstractCell, file_type_obj:AbstractFileType) -> pd.DataFrame:
+def buffer(cell:ba.AbstractCell, file_type_obj:ba.AbstractFileType) -> pd.DataFrame:
     #if file type
     print('Buffering...')
     # list of timeseries files, excluding hidden files
@@ -154,7 +153,7 @@ def buffer(cell:AbstractCell, file_type_obj:AbstractFileType) -> pd.DataFrame:
             print("processing:" + sheetname)
     return df_ts
 
-def process(cell:AbstractCell, engine:Engine, conn:str):
+def process(cell:ba.AbstractCell, engine:Engine, conn:str):
     print('Processing...')
     chunk_size = 30 #number of cells to process at once
     cycle_index_max = get_cycle_index_max(conn, cell.buffer_table, cell.cell_id)
@@ -239,20 +238,17 @@ def get_cycle_index_max(conn:str, table:str, id:str) -> int:
     db_conn.close()
     return cycle_index_max
 
-def get_file_type_obj(tester:str) -> AbstractFileType:
+def get_file_type_obj(tester:str) -> ba.AbstractFileType:
     #make this nicer in future
     #create __init__ file import once 
-    from arbin import Arbin
-    from matlab import Matlab
-    from uconn import UCONN
     if tester == 'arbin':
-        return Arbin()
+        return ba.Arbin()
     elif tester == 'matlab':
-        return Matlab()
+        return ba.Matlab()
     elif tester == 'generic': ##this is not ideal, but all previous metadata uses 'generic'
-        return UCONN()
+        return ba.UCONN()
 
-def delete_data(conn:str, tables_to_delete:list[str], cells_to_delete:list[AbstractCell], id_type:str):
+def delete_data(conn:str, tables_to_delete:list[str], cells_to_delete:list[ba.AbstractCell], id_type:str):
     # this method will delete data for a cell_id. Use with caution as there is no undo
     print('Deleting...')
     all_strs = ''
@@ -329,26 +325,22 @@ def main(argv:list[str]):
 
     #create engine
     engine = create_engine(conn)
-    
-    from lithiumCell import LithiumCell
-    from lithiumModule import LithiumModule
-    from flowCell import FlowCell
 
     if data_type == 'li-cell':
         md = pd.read_excel(pathlib.PurePath(path).joinpath("cell_list.xlsx"))
-        cells_to_import = [LithiumCell(path,row) for ind, row in md.iterrows()]
+        cells_to_import = [ba.LithiumCell(path,row) for ind, row in md.iterrows()]
         if import_type == 'add':
             add_cell_data(engine, conn, cells_to_import)
         elif import_type == 'update':
             update_cell_data(engine, conn, cells_to_import)
     elif data_type == 'flow-cell':
         md = pd.read_excel(pathlib.PurePath(path).joinpath("cell_list.xlsx"))
-        cells_to_import = [FlowCell(path, row) for ind, row in md.iterrows()]
+        cells_to_import = [ba.FlowCell(path, row) for ind, row in md.iterrows()]
         add_cell_data(engine, conn, cells_to_import)
     elif data_type == 'li-module':
         md = pd.read_excel(pathlib.PurePath(path).joinpath("module_list.xlsx"))
-        modules_to_import = [LithiumModule(path, row) for ind, row in md.iterrows()]
-        add_module_data(engine, conn, modules_to_import)
+        modules_to_import = [ba.LithiumModule(path, row) for ind, row in md.iterrows()]
+        add_module_stack_data(engine, conn, modules_to_import)
     return
 
 if __name__ == "__main__":
