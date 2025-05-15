@@ -16,6 +16,7 @@ from abstractCell import AbstractCell
 from abstractModule import AbstractModule
 from abstractFileType import AbstractFileType
 
+
 ##QUESTIONS:
 # most logical naming for args?
 # come up with standardized names for 'generic' csv
@@ -27,9 +28,10 @@ from abstractFileType import AbstractFileType
 # done 3) add flow cells
 # 4) add additional file types (arbin, matlab-stanfordTRI, generic-uconn)
 # 5) create __init__ and package
-# 5) docstrings and types
-# 6) test for typical errors ('break' code intentionally) and improve speed/efficiency
-def add_module_data(engine:Engine, conn:str, modules_to_import:list[AbstractModule]): #for modules and stacks
+# 5.5 improve CLI with click
+# 6) docstrings and types
+# 7) test for typical errors ('break' code intentionally) and improve speed/efficiency (create test suite)
+def add_module_stack_data(engine:Engine, conn:str, modules_to_import:list[AbstractModule]): #for modules and stacks
     #1) import module metadata
     for ind, module in enumerate(modules_to_import):
         id = module.module_id
@@ -247,6 +249,7 @@ def get_file_type_obj(tester:str) -> AbstractFileType:
     from matlab import Matlab
     from uconn import Uconn
     from ezbatt import Ezbatt
+    from maccor import Maccor
     if tester == 'arbin':
         return Arbin()
     elif tester == 'matlab':
@@ -255,6 +258,8 @@ def get_file_type_obj(tester:str) -> AbstractFileType:
         return Uconn()
     elif tester == 'csv':
         return Ezbatt()
+    elif tester =='voltaiq':
+        return Maccor()
 
 def delete_data(conn:str, tables_to_delete:list[str], cells_to_delete:list[AbstractCell], id_type:str):
     # this method will delete data for a cell_id. Use with caution as there is no undo
@@ -352,7 +357,7 @@ def main(argv:list[str]):
     elif data_type == 'li-module':
         md = pd.read_excel(pathlib.PurePath(path).joinpath("module_list.xlsx"))
         modules_to_import = [LithiumModule(path, row) for ind, row in md.iterrows()]
-        add_module_data(engine, conn, modules_to_import)
+        add_module_stack_data(engine, conn, modules_to_import)
     return
 
 if __name__ == "__main__":
