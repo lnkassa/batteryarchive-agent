@@ -11,9 +11,9 @@ import sys, getopt
 from sqlalchemy import create_engine, text, Engine
 import time
 import yaml
+import click
 
 import batteryarchive_agent as ba
-
 
 ##QUESTIONS:
 # most logical naming for args?
@@ -348,5 +348,36 @@ def main(argv:list[str]):
         add_module_stack_data(engine, conn, modules_to_import)
     return
 
+
+# class RichGroup(click.Group):
+#     def format_help(self, ctx, formatter):
+#         # # sio = io.StringIO()
+#         # # console = rich.Console(file=sio, force_terminal=True)
+#         # console.print("Hello, [bold magenta]World[/bold magenta]!", ":vampire:")
+#         # formatter.write(sio.getvalue())
+
+# @click.group(cls=RichGroup)
+
+@click.command()
+@click.argument("batt_type")
+@click.argument("import_type", required=False)
+@click.argument("path")
+def cli(batt_type, import_type, path):
+    dir = pathlib.Path(path)
+    if not dir.exists():
+        click.echo("The data directory does not exist.")
+        raise SystemExit(1)
+    
+    # for entry in dir.iterdir():
+    #     click.echo(f"{entry.name:{len(entry.name) + 5}}", nl=False)
+
+    click.echo(batt_type)
+    click.echo(import_type)
+    
+    click.echo()
+
+
+
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    cli()
+    #main(sys.argv[1:])
