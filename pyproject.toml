@@ -38,7 +38,4 @@ Homepage = "https://github.com/battery-lcf/batteryarchive-agent"
 Issues = "https://github.com/battery-lcf/batteryarchive-agent/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/batteryarchive-agent"]
-
-[project.scripts]
-importer = "importer:cli"
+packages = ["src/batteryarchive_agent"]

@@ -5,8 +5,8 @@ import logging
 import pandas as pd
 import pathlib
 
-from abstractModule import AbstractModule
-from lithiumCell import LithiumCell
+from .abstractModule import AbstractModule
+from .lithiumCell import LithiumCell
 
 class LithiumModule(AbstractModule):
     def __init__(self, path:str, md:pd.DataFrame):

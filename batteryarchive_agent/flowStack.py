@@ -5,8 +5,8 @@ import logging
 import pandas as pd
 import pathlib
 
-from abstractModule import AbstractModule
-from flowCell import FlowCell
+from .abstractModule import AbstractModule
+from .flowCell import FlowCell
 
 class FlowStack(AbstractModule):
     def __init__(self):

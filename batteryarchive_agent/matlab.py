@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import h5py
 
-from abstractFileType import AbstractFileType
+from .abstractFileType import AbstractFileType
 
 class Matlab(AbstractFileType):
     def __init__(self):
