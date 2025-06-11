@@ -23,7 +23,7 @@ import batteryarchive_agent as ba
 # done 1) update data
 # done 1.5) move column mapping to file type classes
 # 2) add module data
-# done 3) add flow cells
+# done 3) add flow cells$
 # done 4) add additional file types (arbin, matlab-stanfordTRI, generic-uconn)
 # done 5) create __init__ and package
 # 5.5 improve CLI with click
@@ -358,26 +358,26 @@ def main(argv:list[str]):
 
 # @click.group(cls=RichGroup)
 
-@click.command()
-@click.argument("batt_type")
-@click.argument("import_type", required=False)
-@click.argument("path")
-def cli(batt_type, import_type, path):
-    dir = pathlib.Path(path)
-    if not dir.exists():
-        click.echo("The data directory does not exist.")
-        raise SystemExit(1)
+# @click.command()
+# @click.argument("batt_type")
+# @click.argument("import_type", required=False)
+# @click.argument("path")
+# def cli(batt_type, import_type, path):
+#     dir = pathlib.Path(path)
+#     if not dir.exists():
+#         click.echo("The data directory does not exist.")
+#         raise SystemExit(1)
     
-    # for entry in dir.iterdir():
-    #     click.echo(f"{entry.name:{len(entry.name) + 5}}", nl=False)
+#     # for entry in dir.iterdir():
+#     #     click.echo(f"{entry.name:{len(entry.name) + 5}}", nl=False)
 
-    click.echo(batt_type)
-    click.echo(import_type)
+#     click.echo(batt_type)
+#     click.echo(import_type)
     
-    click.echo()
+#     click.echo()
 
 
 
 if __name__ == "__main__":
-    cli()
-    #main(sys.argv[1:])
+    #cli()
+    main(sys.argv[1:])
