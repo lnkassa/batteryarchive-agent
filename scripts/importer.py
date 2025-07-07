@@ -50,8 +50,12 @@ def add_module_stack_data(engine:Engine, conn:str, modules_to_import:list[ba.Abs
             cells_to_import = [module.child_type(module.file_path,row) for ind, row in cell_md.iterrows()]
             #need to convert module to cell ts first
             add_cell_data(engine, conn, cell_md, cells_to_import)
-    #2) convert module format to cell
-    #3) import cell data (call add_cell_data)
+        if status=='buffering':
+            pass
+            #move module-level timeseries data to buffer
+        if status=='processing':
+            pass
+            #calculate module-level statistics and move to stats and ts tables
 
 def add_cell_data(engine:Engine, conn:str, cells_to_import:list[ba.AbstractCell]): 
     #adds data to database

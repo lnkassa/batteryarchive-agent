@@ -60,7 +60,7 @@ class LithiumModule(AbstractModule):
     
     def create_cell_df(self, path:str, row) -> pd.DataFrame:
         #creates timeseries dataframe for a single cell from the module data timeseries excel file
-        data_files = glob.glob(os.path.join(path, f"*.xlsx"))
+        data_files = [file for file in pathlib.Path(path).glob('./*') if not any(part.startswith('.') for part in file.parts)]
         data_files = [file for file in data_files if not self.configuration_file and "~$" not in os.path.basename(file)]
         df_module_file = pd.ExcelFile(data_files[0])
         df_cell_ts = pd.DataFrame
