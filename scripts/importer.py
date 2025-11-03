@@ -35,12 +35,16 @@ def add_module_stack_data(engine:Engine, conn:str, modules_to_import:list[ba.Abs
         id = module.module_id
 
         print(module.md)
-        module_md, cell_md = module.populate_metadata()
+        print(module.file_path)
+        print(module.config_path)
+        module_md, cell_md, cycle_md = module.populate_metadata()
 
         try:
             status = get_status(id, module.module_metadata_table, conn, id_type='module')
-        except psycopg2.OperationalError:
+        except psycopg2.OperationalError as e:
+            print(e)
             print('Database is not available.')
+            #exit code
         if status=='completed':
             #logging skipping module id 
             pass
@@ -48,10 +52,9 @@ def add_module_stack_data(engine:Engine, conn:str, modules_to_import:list[ba.Abs
             logging.info('save module metadata')
             module_md.to_sql(module.module_metadata_table, con=engine, if_exists='append', chunksize=1000, index=False)
             cells_to_import = [module.child_type(module.file_path,row) for ind, row in cell_md.iterrows()]
-            #need to convert module to cell ts first
-            add_cell_data(engine, conn, cell_md, cells_to_import)
+            df_ts_list = deconstruct(module) #should cell object hold df_ts? or in list/dictionary?
         if status=='buffering':
-            pass
+            add_cell_data(engine, conn, df_cell_md, df_cycle_md, df_cell_ts, cells_to_import) #change to take in df_ts if applicable
             #move module-level timeseries data to buffer
         if status=='processing':
             pass
@@ -73,6 +76,7 @@ def add_cell_data(engine:Engine, conn:str, cells_to_import:list[ba.AbstractCell]
             status = get_status(id, cell.cell_metadata_table, conn, id_type='cell_id')
         except psycopg2.OperationalError:
             print('Database is not available.')
+            #exit code
         if status=='completed':
             #logging skipping cell id 
             pass
@@ -196,6 +200,23 @@ def process(cell:ba.AbstractCell, engine:Engine, conn:str):
                     print("save timeseries time: " + str(time.time() - start_time))
                     logging.info("save timeseries time: " + str(time.time() - start_time))
 
+def deconstruct(module:ba.AbstractModule, file_type_obj:ba.AbstractFileType): #converts module/stack format to cell format
+    list_ts_fldr = [file for file in pathlib.Path(module.file_path).glob('./*') if not any(part.startswith('.') for part in file.parts)]
+    list_cell_ts_all = []
+    for file_path in list_ts_fldr:
+        print(file_path)
+        df_cell_ts = module.create_cell_df()
+        # try:
+        #     df_module_ts, sheetname = file_type_obj.file_to_df(file_path)
+        # except ValueError as e:
+        #     print('\nI got a ValueError - reason: ' + str(e))
+        #     print('Make sure metadata and data files (and hidden files) are closed. \n')
+        # for cell in cells:
+        #     df_cell_ts = module.create_cell_df()
+        list_cell_ts_all.append(df_cell_ts)
+    df_ts_list = pd.DataFrame(list_cell_ts_all)
+    return df_ts_list
+
 def clear_buffer(id:str, buffer_table:str, conn:str, id_type:str):
     # this method will delete data for a cell_id. Use with caution as there is no undo
     db_conn = psycopg2.connect(conn)
@@ -207,6 +228,7 @@ def clear_buffer(id:str, buffer_table:str, conn:str, id_type:str):
 
 def get_status(id:str, md_table:str, conn:str, id_type:str) -> str:
     sql_str = "select status from " + md_table + " where " + id_type + "= '" + id + "'"
+    print(conn)
     db_conn = psycopg2.connect(conn)
     curs = db_conn.cursor()
     curs.execute(sql_str)

@@ -30,6 +30,7 @@ class LithiumModule(AbstractModule):
         
     def set_path(self, path:str):
         self.file_path = pathlib.PurePath(path).joinpath(self.file_id)
+        self.config_path = pathlib.PurePath(self.file_path).joinpath(self.file_id + '.xlsx')
     
     def set_file_id(self):
         self.file_id = self.md['file_id'] #use get functions
@@ -41,27 +42,44 @@ class LithiumModule(AbstractModule):
         # Build module metadata
         df_module_md = pd.DataFrame()
         df_module_md['module_id'] = [self.md['module_id']]
-        df_module_md['configuration'] = [self.md['configuration']]
-        df_module_md['num_parallel'] = [self.md['cathode']]
-        df_module_md['num_series'] = [self.md['source']]
+        df_module_md['configuration'] = [self.md['configuration']] #capitalization issue
+        df_module_md['num_parallel'] = [self.md['# cells in parallel']]
+        df_module_md['num_series'] = [self.md['# cell in series']]
         # create virtual 'cell_list.xlsx' as a dataframe
-        config = pd.ExcelFile(self.configuration_file)
-        insert_md = pd.DataFrame({'cathode':None,'anode':None,'temperature':None,'soc_max':None,'soc_min':None,'source':None,'crate_c':None,'crate_d':None,'ah':None,'form_factor':None,'tester':None,'test':None,'file_type':None})
-        insert_md = df_module_md[insert_md.columns]
-        df_cell_md = pd.DataFrame()
-        for index, row in config: 
-            df_cell_md.loc[index] = insert_md
-            if row['Type'] == 'Cell':
-                df_cell_md.loc[index] = insert_md
-                df_cell_md.at[index,'cell_id'] = df_module_md['module_id'] + '_' + row['Name'] #create cell_id by concat
-                df_cell_md.at[index,'file_id'] = self.file_id
-        print(df_cell_md) #temp for testing
-        return df_module_md, df_cell_md
+        #config = pd.read_excel(self.config_path)
+        num_cells = df_module_md.at[0, 'num_parallel'] * df_module_md.at[0, 'num_series']
+        list_cell_md = []
+        list_cycle_md = []
+        for c in range(num_cells): 
+            list_cell_row = (
+                'internal',
+                 self.module_id + '_' + self.file_id,
+                 self.md['cathode'],
+                 self.md['anode'],
+                 self.md['source'],
+                 self.md['ah'],
+                 self.md['form_factor'],
+                 self.md['tester'],
+                 self.md['test']
+            )
+            list_cycle_row = (
+                self.module_id + '_' + self.file_id,
+                self.md['temperature'],
+                self.md['soc_max'],
+                self.md['soc_min'],
+                self.md['crate_c'],
+                self.md['crate_d']
+            )
+            list_cell_md.append(list_cell_row)
+            list_cycle_md.append(list_cycle_row)
+        df_cell_md = pd.DataFrame(list_cell_md, columns=['file_id', 'cell_id', 'cathode', 'anode', 'source', 'ah', 'form_factor', 'tester', 'test'])
+        df_cycle_md = pd.DataFrame(list_cycle_md, columns=['cell_id', 'temperature', 'soc_max', 'soc_min', 'crate_c', 'crate_d'])
+        return df_module_md, df_cell_md, df_cycle_md
     
     def create_cell_df(self, path:str, row) -> pd.DataFrame:
         #creates timeseries dataframe for a single cell from the module data timeseries excel file
         data_files = [file for file in pathlib.Path(path).glob('./*') if not any(part.startswith('.') for part in file.parts)]
-        data_files = [file for file in data_files if not self.configuration_file and "~$" not in os.path.basename(file)]
+        #data_files = [file for file in data_files if not self.configuration_file and "~$" not in os.path.basename(file)]
         df_module_file = pd.ExcelFile(data_files[0])
         df_cell_ts = pd.DataFrame
         #Column names
