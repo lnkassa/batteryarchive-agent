@@ -40,7 +40,7 @@ def add_module_stack_data(engine:Engine, conn:str, modules_to_import:list[ba.Abs
         module_md, cell_md, cycle_md = module.populate_metadata()
 
         try:
-            status = get_status(id, module.module_metadata_table, conn, id_type='module')
+            status = get_status(id, module.module_metadata_table, conn, id_type='module_id')
         except psycopg2.OperationalError as e:
             print(e)
             print('Database is not available.')
@@ -51,8 +51,8 @@ def add_module_stack_data(engine:Engine, conn:str, modules_to_import:list[ba.Abs
         if status=='new':
             logging.info('save module metadata')
             module_md.to_sql(module.module_metadata_table, con=engine, if_exists='append', chunksize=1000, index=False)
-            cells_to_import = [module.child_type(module.file_path,row) for ind, row in cell_md.iterrows()]
             df_ts_list = deconstruct(module) #should cell object hold df_ts? or in list/dictionary?
+            cells_to_import = [ba.LithiumCell(path='internal',md=row) for ind, row in cell_md.iterrows()]
         if status=='buffering':
             add_cell_data(engine, conn, df_cell_md, df_cycle_md, df_cell_ts, cells_to_import) #change to take in df_ts if applicable
             #move module-level timeseries data to buffer
@@ -228,17 +228,17 @@ def clear_buffer(id:str, buffer_table:str, conn:str, id_type:str):
 
 def get_status(id:str, md_table:str, conn:str, id_type:str) -> str:
     sql_str = "select status from " + md_table + " where " + id_type + "= '" + id + "'"
-    print(conn)
     db_conn = psycopg2.connect(conn)
     curs = db_conn.cursor()
     curs.execute(sql_str)
     db_conn.commit()
     record = curs.fetchall()
+    print(record)
     if record:
         status = record[0][0]
     else:
         status = 'new'
-    print('cell status is: ' + status)
+    print('cell status is: ' + str(status))
     return status
 
 def set_status(id:str, md_table:str, conn:str, status:str, id_type:str):
