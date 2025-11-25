@@ -23,7 +23,7 @@ import batteryarchive_agent as ba
 # done 1) update data
 # done 1.5) move column mapping to file type classes
 # 2) add module data
-# done 3) add flow cells$
+# done 3) add flow cells
 # done 4) add additional file types (arbin, matlab-stanfordTRI, generic-uconn)
 # done 5) create __init__ and package
 # 5.5 improve CLI with click
@@ -33,12 +33,11 @@ def add_module_stack_data(engine:Engine, conn:str, modules_to_import:list[ba.Abs
     #1) import module metadata
     for ind, module in enumerate(modules_to_import):
         id = module.module_id
-
+        file_type_obj = get_file_type_obj(module.tester)
         print(module.md)
         print(module.file_path)
         print(module.config_path)
-        module_md, cell_md, cycle_md = module.populate_metadata()
-
+        module_md, cell_md = module.populate_metadata()
         try:
             status = get_status(id, module.module_metadata_table, conn, id_type='module_id')
         except psycopg2.OperationalError as e:
@@ -51,16 +50,23 @@ def add_module_stack_data(engine:Engine, conn:str, modules_to_import:list[ba.Abs
         if status=='new':
             logging.info('save module metadata')
             module_md.to_sql(module.module_metadata_table, con=engine, if_exists='append', chunksize=1000, index=False)
-            df_ts_list = deconstruct(module) #should cell object hold df_ts? or in list/dictionary?
-            cells_to_import = [ba.LithiumCell(path='internal',md=row) for ind, row in cell_md.iterrows()]
+            df_cell_list, df_module = deconstruct(module, file_type_obj) 
+            if module.child_type == type(ba.LithiumCell): #how to generalize this
+                cells_to_import = [ba.LithiumCell(path='internal',md=row) for ind, row in cell_md.iterrows()] 
+            status = 'buffering'
+            set_status(id, module.module_metadata_table, conn, status, id_type='module_id')
         if status=='buffering':
-            add_cell_data(engine, conn, df_cell_md, df_cycle_md, df_cell_ts, cells_to_import) #change to take in df_ts if applicable
-            #move module-level timeseries data to buffer
+            df_module.to_sql(module.buffer_table, con=engine, if_exists='append', chunksize=1000, index=False)
+            add_cell_data(engine, conn, cells_to_import, cell_ts_list=df_cell_list, parent=module.module_id) 
+            status = 'processing'
+            set_status(id, module.module_metadata_table, conn, status, id_type='module_id')
         if status=='processing':
-            pass
-            #calculate module-level statistics and move to stats and ts tables
+            process_module(module, engine, conn)
+            status = 'completed'
+        set_status(id, module.module_metadata_table, conn, status, id_type='module_id')
+        #clear_buffer(id, module.buffer_table, conn, id_type='module_id') #redundant?
 
-def add_cell_data(engine:Engine, conn:str, cells_to_import:list[ba.AbstractCell]): 
+def add_cell_data(engine:Engine, conn:str, cells_to_import:list[ba.AbstractCell], cell_ts_list=None, parent=None): 
     #adds data to database
     #logging
     for ind, cell in enumerate(cells_to_import):
@@ -71,7 +77,8 @@ def add_cell_data(engine:Engine, conn:str, cells_to_import:list[ba.AbstractCell]
     
         print(cell.md) #print current cell metadata
         cell_md, cycle_md = cell.populate_metadata()
-        
+        if parent != None:
+            cell_md['parent_id'] = parent
         try:
             status = get_status(id, cell.cell_metadata_table, conn, id_type='cell_id')
         except psycopg2.OperationalError:
@@ -90,14 +97,15 @@ def add_cell_data(engine:Engine, conn:str, cells_to_import:list[ba.AbstractCell]
         if status=='buffering':
             logging.info('adding files')
             start_time = time.time()
-            df_ts = buffer(cell, get_file_type_obj(cell.tester))
+            df_ts = buffer(cell, get_file_type_obj(cell.tester), cell_ts_list)
+            logging.info(df_ts)
             df_ts.to_sql(cell.buffer_table, con=engine, if_exists='append', chunksize=1000, index=False)
             print("saved=" + cell.cell_id + " time: " + str(time.time() - start_time))
             start_time = time.time()
             status='processing'
             set_status(id, cell.cell_metadata_table, conn, status, id_type='cell_id')
         if status=='processing':
-            process(cell, engine, conn)
+            process_cell(cell, engine, conn)
         set_status(id, cell.cell_metadata_table, conn, status='completed', id_type='cell_id')
         clear_buffer(id, cell.buffer_table, conn, id_type='cell_id')
 
@@ -126,44 +134,56 @@ def update_cell_data(engine, conn:str, cells_to_import:list[ba.AbstractCell]):
         set_status(id, cell.cell_metadata_table, conn, status='completed', id_type='cell_id')
         clear_buffer(id, cell.buffer_table, conn, id_type='cell_id')
 
-def buffer(cell:ba.AbstractCell, file_type_obj:ba.AbstractFileType) -> pd.DataFrame:
+def buffer(cell:ba.AbstractCell, file_type_obj:ba.AbstractFileType, cell_ts_list=None) -> pd.DataFrame:
     #if file type
     print('Buffering...')
     # list of timeseries files, excluding hidden files
-    list_ts_fldr = [file for file in pathlib.Path(cell.file_path).glob('./*') if not any(part.startswith('.') for part in file.parts)]
-    #check if enough files exist (more than 1)
-    for i in range(len(list_ts_fldr)):
-        print(list_ts_fldr[i])
-    for file_path in list_ts_fldr:
-        df_ts = pd.DataFrame() #df to send to database
-        try:
-            df_ts_file, sheetname = file_type_obj.file_to_df(file_path)#order to do this??
-        except ValueError as e:
-            print('\nI got a ValueError - reason: ' + str(e))
-            print('Make sure metadata and data files (and hidden files) are closed. \n')
-        try:
-            keys = {'cycle_index','i','v','date_time','test_time','env_temperature','cell_temperature'}
-            for key in keys:
-                if key in file_type_obj.col_mapping:
-                    df_ts[key] = df_ts_file[file_type_obj.col_mapping[key]]
-                if 'date_time' == key and 'test_time' not in file_type_obj.col_mapping:
-                    df_ts['test_time'] = file_type_obj.datetime_to_testtime(df_ts_file)
-                elif 'test_time' not in file_type_obj.col_mapping and 'date_time' not in file_type_obj.col_mapping:#change to check if all necessary columns exist
-                    #exit code
-                    print('There is no time data in the timeseries file.')
-            df_ts['cell_id'] = cell.cell_id
-            df_ts['sheetname'] = cell.file_id + "|" + sheetname
-            df_ts['component_level'] = 'cell'
-            cycle_index_file_max = df_ts['cycle_index'].max()
+    all_ts_list = []
+    if cell_ts_list == None:
+        list_ts_fldr = [file for file in pathlib.Path(cell.file_path).glob('./*') if not any(part.startswith('.') for part in file.parts)]
+        #check if enough files exist (more than 1)
+        for i in range(len(list_ts_fldr)):
+            print(list_ts_fldr[i])
+        cell_ts_list = []
+        for file_path in list_ts_fldr:
+            try:
+                df_ts_file, sheetname = file_type_obj.file_to_df(file_path)#order to do this??
+                cell_ts_list.append((df_ts_file, sheetname))
+            except ValueError as e:
+                print('\nI got a ValueError - reason: ' + str(e))
+                print('Make sure metadata and data files (and hidden files) are closed. \n')
+        for df_ts_file, sheetname in cell_ts_list:
+            df_ts = pd.DataFrame() 
+            try:
+                keys = {'cycle_index','i','v','date_time','test_time','env_temperature','cell_temperature'}
+                for key in keys:
+                    if key in file_type_obj.col_mapping:
+                        df_ts[key] = df_ts_file[file_type_obj.col_mapping[key]]
+                    if 'date_time' == key and 'test_time' not in file_type_obj.col_mapping:
+                        df_ts['test_time'] = file_type_obj.datetime_to_testtime(df_ts_file)
+                    elif 'test_time' not in file_type_obj.col_mapping and 'date_time' not in file_type_obj.col_mapping:#change to check if all necessary columns exist
+                        #exit code
+                        print('There is no time data in the timeseries file.')
+                df_ts['cell_id'] = cell.cell_id
+                df_ts['sheetname'] = cell.file_id + "|" + sheetname
+                df_ts['component_level'] = 'cell'
+                cycle_index_file_max = df_ts['cycle_index'].max()
+                all_ts_list.append(df_ts)
+                #print('saving sheet: ' + sheetname + ' with max cycle: ' +str(cycle_index_file_max))
 
-            print('saving sheet: ' + sheetname + ' with max cycle: ' +str(cycle_index_file_max))
+            except KeyError as e:
+                print("I got a KeyError - reason " + str(e))
+                print("processing:" + sheetname)
+    else: #if cell_ts_list from module (internal)
+        for df_ts_file, sheetname in cell_ts_list:
+            df_ts_file['cell_id'] = cell.cell_id
+            df_ts_file['sheetname'] = cell.file_id + "|" + sheetname
+            df_ts_file['component_level'] = 'cell'
+            all_ts_list.append(df_ts_file)
+        return pd.concat(all_ts_list)
+    return pd.concat(all_ts_list)
 
-        except KeyError as e:
-            print("I got a KeyError - reason " + str(e))
-            print("processing:" + sheetname)
-    return df_ts
-
-def process(cell:ba.AbstractCell, engine:Engine, conn:str):
+def process_cell(cell:ba.AbstractCell, engine:Engine, conn:str):
     print('Processing...')
     chunk_size = 30 #number of cells to process at once
     cycle_index_max = get_cycle_index_max(conn, cell.buffer_table, cell.cell_id)
@@ -200,22 +220,59 @@ def process(cell:ba.AbstractCell, engine:Engine, conn:str):
                     print("save timeseries time: " + str(time.time() - start_time))
                     logging.info("save timeseries time: " + str(time.time() - start_time))
 
-def deconstruct(module:ba.AbstractModule, file_type_obj:ba.AbstractFileType): #converts module/stack format to cell format
+def process_module(module:ba.AbstractModule, engine:Engine, conn:str):
+    print('Processing module level...')
+    chunk_size = 30 #number of cells to process at once
+    cycle_index_max = get_cycle_index_max(conn, module.buffer_table, module.module_id)
+    cycle_stats_index_max = get_cycle_index_max(conn, module.stats_table, module.module_id)
+    start_cycle = 1
+    start_time = time.time()
+    for i in range(cycle_index_max+1):
+        if (i-1) % chunk_size == 0 and i > 0 and i>cycle_stats_index_max:
+            start_cycle = i
+            end_cycle = start_cycle + chunk_size - 1
+            sql_cell =  " cell_id='" + module.module_id + "'" 
+            sql_cycle = " and cycle_index>=" + str(start_cycle) + " and cycle_index<=" + str(end_cycle)
+            sql_str = text("select * from "+ module.buffer_table + " where" + sql_cell + sql_cycle + " order by test_time")
+            print(sql_str)
+            with engine.begin() as connection:
+                df_ts = pd.read_sql(sql_str, connection)
+
+                df_ts.drop('sheetname', axis=1, inplace=True)
+
+                if not df_ts.empty:
+                    start_time = time.time()
+                    df_cycle_stats = module.calc_cycle(df_ts, engine)
+                    df_cycle_timeseries = module.calc_timeseries(df_ts)
+                    print("calc_stats time: " + str(time.time() - start_time))
+                    logging.info("calc_stats time: " + str(time.time() - start_time))
+
+                    start_time = time.time()
+                    df_cycle_stats.to_sql(module.stats_table, con=engine, if_exists='append', chunksize=1000, index=False)
+                    print("save stats time: " + str(time.time() - start_time))
+                    logging.info("save stats time: " + str(time.time() - start_time))
+
+                    start_time = time.time()
+                    df_cycle_timeseries.to_sql(module.timeseries_table, con=engine, if_exists='append', chunksize=1000, index=False)
+                    print("save timeseries time: " + str(time.time() - start_time))
+                    logging.info("save timeseries time: " + str(time.time() - start_time))
+
+def deconstruct(module:ba.AbstractModule, file_type_obj:ba.AbstractFileType) -> list[pd.DataFrame]: #converts module/stack format to cell format
     list_ts_fldr = [file for file in pathlib.Path(module.file_path).glob('./*') if not any(part.startswith('.') for part in file.parts)]
     list_cell_ts_all = []
-    for file_path in list_ts_fldr:
-        print(file_path)
-        df_cell_ts = module.create_cell_df()
-        # try:
-        #     df_module_ts, sheetname = file_type_obj.file_to_df(file_path)
-        # except ValueError as e:
-        #     print('\nI got a ValueError - reason: ' + str(e))
-        #     print('Make sure metadata and data files (and hidden files) are closed. \n')
-        # for cell in cells:
-        #     df_cell_ts = module.create_cell_df()
-        list_cell_ts_all.append(df_cell_ts)
-    df_ts_list = pd.DataFrame(list_cell_ts_all)
-    return df_ts_list
+    config_df = pd.read_excel(module.config_path)
+    for file_path in list_ts_fldr: #this is not ideal
+        if file_path != module.config_path:
+            data_path = file_path
+    df_module_ts, sheetname = file_type_obj.file_to_df(data_path)
+    for index, row in config_df.iterrows():
+        if row['Type'] == 'Module':
+            module_data = module.create_df(df_module_ts, row)
+        elif row['Type'] == 'Cell':
+            df_cell_ts = module.create_df(df_module_ts, row)
+            list_cell_ts_all.append((df_cell_ts, '')) #'' in place of sheetnames
+    #df_ts_list = pd.DataFrame(list_cell_ts_all)
+    return list_cell_ts_all, module_data
 
 def clear_buffer(id:str, buffer_table:str, conn:str, id_type:str):
     # this method will delete data for a cell_id. Use with caution as there is no undo
@@ -233,12 +290,11 @@ def get_status(id:str, md_table:str, conn:str, id_type:str) -> str:
     curs.execute(sql_str)
     db_conn.commit()
     record = curs.fetchall()
-    print(record)
     if record:
         status = record[0][0]
     else:
         status = 'new'
-    print('cell status is: ' + str(status))
+    print(id_type + ' status is: ' + str(status))
     return status
 
 def set_status(id:str, md_table:str, conn:str, status:str, id_type:str):

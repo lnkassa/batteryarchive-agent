@@ -90,6 +90,7 @@ class LithiumCell(AbstractCell):
         df_c['test_time'] = 0
         df_c['ah_eff'] = 0
         df_c['e_eff'] = 0
+        df_c['component_level'] = 'cell'
         convert_dict = {'cell_id': str,
             'cycle_index': int,
             'v_max': float,
@@ -105,6 +106,7 @@ class LithiumCell(AbstractCell):
             'test_time': float,
             'ah_eff': float,
             'e_eff': float,
+            'component_level':str
         }
         df_c = df_c.astype(convert_dict)
         for c_ind in df_c.index:
@@ -219,6 +221,7 @@ class LithiumCell(AbstractCell):
         # Build cell metadata
         df_cell_md = pd.DataFrame()
         df_cell_md['cell_id'] = [self.md['cell_id']]
+        df_cell_md['parent_id'] = None
         df_cell_md['anode'] = [self.md['anode']]
         df_cell_md['cathode'] = [self.md['cathode']]
         df_cell_md['source'] = [self.md['source']]
@@ -234,5 +237,4 @@ class LithiumCell(AbstractCell):
         df_cycle_md['soc_max'] = [self.md['soc_max']]
         df_cycle_md['soc_min'] = [self.md['soc_min']]
         df_cycle_md['temperature'] = [self.md['temperature']]
-
         return df_cell_md, df_cycle_md

@@ -12,6 +12,7 @@ class Arbin(AbstractFileType):
         self.reader_func = 'read_excel'
         self.col_mapping = {'cycle_index' : 'Cycle_Index',
                             'test_time' : 'Test_Time(s)',
+                            'date_time': 'Date_Time',
                             'i' : 'Current(A)',
                             'v' : 'Voltage(V)'}
         self.unit_mult = {'A' : 1, 'V' : 1, 's' : 1}

@@ -24,9 +24,21 @@ class AbstractModule(ABC):
         pass
 
     @abstractmethod
+    def calc_timeseries(self):
+        return
+
+    @abstractmethod
+    def calc_cycle(self):
+        return
+    
+    @abstractmethod
+    def calc_cycle_quantities(self):
+        return 
+    
+    @abstractmethod
     def populate_metadata(self):
         return
     
     @abstractmethod
-    def create_cell_df(self, path, row):
+    def create_df(self, path, row):
         return
