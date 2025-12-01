@@ -22,7 +22,7 @@ import batteryarchive_agent as ba
 # done 0) find place for column conversion date_time <-> test_time 
 # done 1) update data
 # done 1.5) move column mapping to file type classes
-# 2) add module data
+# done 2) add module data
 # done 3) add flow cells
 # done 4) add additional file types (arbin, matlab-stanfordTRI, generic-uconn)
 # done 5) create __init__ and package
@@ -130,7 +130,7 @@ def update_cell_data(engine, conn:str, cells_to_import:list[ba.AbstractCell]):
             status='processing'
             set_status(id, cell.cell_metadata_table, conn, status, id_type='cell_id')
         if status=='processing':
-            process(cell, engine, conn)
+            process_cell(cell, engine, conn)
         set_status(id, cell.cell_metadata_table, conn, status='completed', id_type='cell_id')
         clear_buffer(id, cell.buffer_table, conn, id_type='cell_id')
 
