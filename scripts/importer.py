@@ -2,41 +2,23 @@
 # Copyright 2025 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this software.
 
 import logging
-import logging.config
 import pandas as pd
-pd.options.mode.chained_assignment = None  # default='warn'
+#pd.options.mode.chained_assignment = None  # default='warn'
 import pathlib
 import psycopg2
 import sys, getopt
 from sqlalchemy import create_engine, text, Engine
 import time
 import yaml
-import click
 
 import batteryarchive_agent as ba
 
-##QUESTIONS:
-# most logical naming for args?
-# come up with standardized names for 'generic' csv
-
-# done 0) find place for column conversion date_time <-> test_time 
-# done 1) update data
-# done 1.5) move column mapping to file type classes
-# done 2) add module data
-# done 3) add flow cells
-# done 4) add additional file types (arbin, matlab-stanfordTRI, generic-uconn)
-# done 5) create __init__ and package
-# 5.5 improve CLI with click
-# 6) docstrings and types
-# 7) test for typical errors ('break' code intentionally) and improve speed/efficiency (create test suite)
 def add_module_stack_data(engine:Engine, conn:str, modules_to_import:list[ba.AbstractModule]): #for modules and stacks
-    #1) import module metadata
     for ind, module in enumerate(modules_to_import):
         id = module.module_id
         file_type_obj = get_file_type_obj(module.tester)
+
         print(module.md)
-        print(module.file_path)
-        print(module.config_path)
         module_md, cell_md = module.populate_metadata()
         try:
             status = get_status(id, module.module_metadata_table, conn, id_type='module_id')
@@ -45,13 +27,13 @@ def add_module_stack_data(engine:Engine, conn:str, modules_to_import:list[ba.Abs
             print('Database is not available.')
             #exit code
         if status=='completed':
-            #logging skipping module id 
+            logging.info('skipping module/stack: ' + id)
             pass
         if status=='new':
-            logging.info('save module metadata')
+            logging.info('save module/stack metadata')
             module_md.to_sql(module.module_metadata_table, con=engine, if_exists='append', chunksize=1000, index=False)
             df_cell_list, df_module = deconstruct(module, file_type_obj) 
-            if module.child_type == type(ba.LithiumCell): #how to generalize this
+            if module.child_type == type(ba.LithiumCell): 
                 cells_to_import = [ba.LithiumCell(path='internal',md=row) for ind, row in cell_md.iterrows()] 
             status = 'buffering'
             set_status(id, module.module_metadata_table, conn, status, id_type='module_id')
@@ -64,18 +46,17 @@ def add_module_stack_data(engine:Engine, conn:str, modules_to_import:list[ba.Abs
             process_module(module, engine, conn)
             status = 'completed'
         set_status(id, module.module_metadata_table, conn, status, id_type='module_id')
-        #clear_buffer(id, module.buffer_table, conn, id_type='module_id') #redundant?
+        clear_buffer(id, module.buffer_table, conn, id_type='module_id') 
 
 def add_cell_data(engine:Engine, conn:str, cells_to_import:list[ba.AbstractCell], cell_ts_list=None, parent=None): 
-    #adds data to database
-    #logging
+    logging.info('adding cells')
     for ind, cell in enumerate(cells_to_import):
         id = cell.cell_id
         cell.set_file_id()
         cell.set_file_type()
         cell.set_tester()
     
-        print(cell.md) #print current cell metadata
+        print(cell.md) 
         cell_md, cycle_md = cell.populate_metadata()
         if parent != None:
             cell_md['parent_id'] = parent
@@ -85,7 +66,7 @@ def add_cell_data(engine:Engine, conn:str, cells_to_import:list[ba.AbstractCell]
             print('Database is not available.')
             #exit code
         if status=='completed':
-            #logging skipping cell id 
+            logging.info('skipping cell: ' + id)
             pass
         if status=='new':
             logging.info('save cell metadata')
@@ -125,7 +106,6 @@ def update_cell_data(engine, conn:str, cells_to_import:list[ba.AbstractCell]):
             df_ts.to_sql(cell.buffer_table, con=engine, if_exists='append', chunksize=1000, index=False)
             print("saved=" + cell.cell_id + " time: " + str(time.time() - start_time))
             start_time = time.time()
-            #remove old data
             delete_data(conn, tables_to_delete=(cell.timeseries_table,cell.stats_table), cells_to_delete=[cell], id_type='cell_id')
             status='processing'
             set_status(id, cell.cell_metadata_table, conn, status, id_type='cell_id')
@@ -135,7 +115,6 @@ def update_cell_data(engine, conn:str, cells_to_import:list[ba.AbstractCell]):
         clear_buffer(id, cell.buffer_table, conn, id_type='cell_id')
 
 def buffer(cell:ba.AbstractCell, file_type_obj:ba.AbstractFileType, cell_ts_list=None) -> pd.DataFrame:
-    #if file type
     print('Buffering...')
     # list of timeseries files, excluding hidden files
     all_ts_list = []
@@ -169,7 +148,6 @@ def buffer(cell:ba.AbstractCell, file_type_obj:ba.AbstractFileType, cell_ts_list
                 df_ts['component_level'] = 'cell'
                 cycle_index_file_max = df_ts['cycle_index'].max()
                 all_ts_list.append(df_ts)
-                #print('saving sheet: ' + sheetname + ' with max cycle: ' +str(cycle_index_file_max))
 
             except KeyError as e:
                 print("I got a KeyError - reason " + str(e))
@@ -261,7 +239,7 @@ def deconstruct(module:ba.AbstractModule, file_type_obj:ba.AbstractFileType) -> 
     list_ts_fldr = [file for file in pathlib.Path(module.file_path).glob('./*') if not any(part.startswith('.') for part in file.parts)]
     list_cell_ts_all = []
     config_df = pd.read_excel(module.config_path)
-    for file_path in list_ts_fldr: #this is not ideal
+    for file_path in list_ts_fldr: #this is not ideal, loop through folder to find data path
         if file_path != module.config_path:
             data_path = file_path
     df_module_ts, sheetname = file_type_obj.file_to_df(data_path)
@@ -271,7 +249,6 @@ def deconstruct(module:ba.AbstractModule, file_type_obj:ba.AbstractFileType) -> 
         elif row['Type'] == 'Cell':
             df_cell_ts = module.create_df(df_module_ts, row)
             list_cell_ts_all.append((df_cell_ts, '')) #'' in place of sheetnames
-    #df_ts_list = pd.DataFrame(list_cell_ts_all)
     return list_cell_ts_all, module_data
 
 def clear_buffer(id:str, buffer_table:str, conn:str, id_type:str):
@@ -430,36 +407,5 @@ def main(argv:list[str]):
         add_module_stack_data(engine, conn, modules_to_import)
     return
 
-
-# class RichGroup(click.Group):
-#     def format_help(self, ctx, formatter):
-#         # # sio = io.StringIO()
-#         # # console = rich.Console(file=sio, force_terminal=True)
-#         # console.print("Hello, [bold magenta]World[/bold magenta]!", ":vampire:")
-#         # formatter.write(sio.getvalue())
-
-# @click.group(cls=RichGroup)
-
-# @click.command()
-# @click.argument("batt_type")
-# @click.argument("import_type", required=False)
-# @click.argument("path")
-# def cli(batt_type, import_type, path):
-#     dir = pathlib.Path(path)
-#     if not dir.exists():
-#         click.echo("The data directory does not exist.")
-#         raise SystemExit(1)
-    
-#     # for entry in dir.iterdir():
-#     #     click.echo(f"{entry.name:{len(entry.name) + 5}}", nl=False)
-
-#     click.echo(batt_type)
-#     click.echo(import_type)
-    
-#     click.echo()
-
-
-
 if __name__ == "__main__":
-    #cli()
     main(sys.argv[1:])

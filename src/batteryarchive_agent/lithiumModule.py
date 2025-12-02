@@ -15,7 +15,7 @@ class LithiumModule(AbstractModule):
         self.timeseries_table = 'cycle_timeseries'
         self.buffer_table = 'cycle_timeseries_buffer'
         self.stats_table = 'cycle_stats'
-        self.md = md #metadata from module?
+        self.md = md 
         self.child_type = type(LithiumCell)
 
         self.module_id = self.md['module_id']
@@ -34,7 +34,7 @@ class LithiumModule(AbstractModule):
         self.config_path = pathlib.PurePath(self.file_path).joinpath(self.file_id + '.xlsx')
     
     def set_file_id(self):
-        self.file_id = self.md['file_id'] #use get functions
+        self.file_id = self.md['file_id']
     
     def set_file_type(self):
         self.file_type = self.md['file_type']
@@ -77,7 +77,7 @@ class LithiumModule(AbstractModule):
         logging.info('calculate cycle time and cycle statistics')
         no_cycles = int(df_t['cycle_index'].max())
         # Initialize the cycle_data time frame
-        a = [x for x in range(no_cycles-30, no_cycles)]  # using loops
+        a = [x for x in range(no_cycles-30, no_cycles)] 
         df_c = pd.DataFrame(data=a, columns=["cycle_index"]) 
 
         df_c['cell_id'] = self.module_id
@@ -226,10 +226,10 @@ class LithiumModule(AbstractModule):
         # Build module metadata
         df_module_md = pd.DataFrame()
         df_module_md['module_id'] = [self.md['module_id']]
-        df_module_md['configuration'] = [self.md['configuration']] #capitalization issue
+        df_module_md['configuration'] = [self.md['configuration']] # ensure capitalization correct in md file
         df_module_md['num_parallel'] = [self.md['# cells in parallel']]
         df_module_md['num_series'] = [self.md['# cell in series']]
-        # create virtual 'cell_list.xlsx' as a dataframe
+        # Create virtual 'cell_list.xlsx' as a dataframe
         list_cell_md = []
         list_cycle_md = []
         for c in range(self.num_cells): 
@@ -250,25 +250,13 @@ class LithiumModule(AbstractModule):
                 self.md['test'],
                 self.md['file_type']
             )
-            # list_cycle_row = (
-            #     self.module_id + '_' + self.file_id,
-            #     self.md['temperature'],
-            #     self.md['soc_max'],
-            #     self.md['soc_min'],
-            #     self.md['crate_c'],
-            #     self.md['crate_d']
-            # )
             list_cell_md.append(list_cell_row)
-            # list_cycle_md.append(list_cycle_row)
         df_cell_md = pd.DataFrame(list_cell_md, columns=['file_id', 'cell_id', 'cathode', 'anode', 'temperature', 'soc_max', 'soc_min', 'source', 'crate_c', 'crate_d', 'ah', 'form_factor', 'tester', 'test', 'file_type'])
-        # df_cycle_md = pd.DataFrame(list_cycle_md, columns=['cell_id', 'temperature', 'soc_max', 'soc_min', 'crate_c', 'crate_d'])
         return df_module_md, df_cell_md
     
     def create_df(self, module_df_ts:pd.DataFrame, row) -> pd.DataFrame:
-        #creates timeseries dataframe for a single cell from the module data timeseries excel file
-        # #Column names
+        # Creates timeseries dataframe for a single cell from the module data timeseries excel file
         df_ts = pd.DataFrame(columns = ['date_time', 'cycle_index', 'test_time', 'i', 'v'])
-        # #Timeseries data
         df_ts['date_time'] = module_df_ts[row['Timestamp column']]
         df_ts['cycle_index'] = module_df_ts[row['Cycle index column']]
         df_ts['test_time'] = module_df_ts[row['Test time column']]
@@ -282,12 +270,3 @@ class LithiumModule(AbstractModule):
             df_ts['cell_id'] = self.module_id
         return df_ts
     
-
-#module import
-#add metadata
-#separate module and cell ts data (deconstruct)
-#call add_cell_data for cells
-#buffer cell data 
-#process cell data
-#buffer module ts data
-#process module ts data

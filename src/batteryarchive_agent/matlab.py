@@ -48,7 +48,6 @@ class Matlab(AbstractFileType):
             key = 'b3c' + str(i)
             bat_dict[key] = cell_dict
             
-        #print(df_battery)
         return df_battery, ''
     
     def datetime_to_testtime(self):

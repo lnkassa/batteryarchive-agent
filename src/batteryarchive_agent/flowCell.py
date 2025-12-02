@@ -29,7 +29,7 @@ class FlowCell(AbstractCell):
         self.file_path = pathlib.PurePath(path).joinpath(self.file_id)
     
     def set_file_id(self):
-        self.file_id = self.md['file_id'] #use get functions
+        self.file_id = self.md['file_id']
     
     def set_file_type(self):
         self.file_type = self.md['file_type']
@@ -70,7 +70,7 @@ class FlowCell(AbstractCell):
         df_t['cycle_time'] = 0
         no_cycles = int(df_t['cycle_index'].max())
         # Initialize the cycle_data time frame
-        a = [x for x in range(no_cycles-30, no_cycles)]  # using loops
+        a = [x for x in range(no_cycles-30, no_cycles)]
         df_c = pd.DataFrame(data=a, columns=["cycle_index"]) 
         
         #'cmltv' = 'cumulative'
@@ -84,7 +84,6 @@ class FlowCell(AbstractCell):
         df_c['ah_d'] = 0
         df_c['e_c'] = 0
         df_c['e_d'] = 0
-        #find better solution for this
         with engine.connect() as conn:
             init = pd.read_sql(text("select max(e_c_cmltv) from " + self.stats_table + " where cell_id='"+self.cell_id+"'"), conn).iloc[0,0] #for continuity btwn calc_stats calls
             init = 0 if init == None else init
@@ -120,7 +119,6 @@ class FlowCell(AbstractCell):
     
         df_c = df_c.astype(convert_dict)
         for c_ind in df_c.index:
-            #x = c_ind + 1
             x = no_cycles + c_ind - 29
             
             df_f = df_t[df_t['cycle_index'] == x]
@@ -255,11 +253,9 @@ class FlowCell(AbstractCell):
         df_cell_md['pe_volume'] = [self.md['PE volume (L)']]  
         df_cell_md['flow_rate'] = [self.md['flow rate (L/min)']]
         df_cell_md['test_type'] = [self.md['test type']]
-        #df_cell_md['source'] = [self.md['source']]
         df_cell_md['test'] = [self.md['test']]
         df_cell_md['tester'] = [self.md['tester']]
         
         # Build cycle metadata - TODO
         df_cycle_md = pd.DataFrame()
-        
         return df_cell_md, df_cycle_md

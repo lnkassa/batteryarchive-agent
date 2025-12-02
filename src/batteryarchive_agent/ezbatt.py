@@ -16,7 +16,7 @@ class Ezbatt(AbstractFileType):
 
     def file_to_df(self, path:str) -> tuple[pd.DataFrame, str]:
         read_func = getattr(pd, self.reader_func)
-        if self.reader_func=='read_excel': #is there a better way to choose this if needed?
+        if self.reader_func=='read_excel':
             df_ts_file = read_func(path, None)
             for sheet in df_ts_file.keys():
                 if 'channel' in sheet.lower():

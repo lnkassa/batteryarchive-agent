@@ -14,14 +14,13 @@ class LithiumCell(AbstractCell):
         self.timeseries_table = 'cycle_timeseries'
         self.buffer_table = 'cycle_timeseries_buffer'
         self.stats_table = 'cycle_stats'
-        self.md = md #metadata from module?
+        self.md = md 
 
         self.cell_id = self.md['cell_id']
         self.set_file_id()
         self.set_tester()
         self.set_file_type()
         self.set_path(path)
-        #self.parent = parent #if cell is part of module
 
     def set_tester(self):
         self.tester = self.md['tester']
@@ -30,7 +29,7 @@ class LithiumCell(AbstractCell):
         self.file_path = pathlib.PurePath(path).joinpath(self.file_id)
     
     def set_file_id(self):
-        self.file_id = self.md['file_id'] #use get functions
+        self.file_id = self.md['file_id'] 
     
     def set_file_type(self):
         self.file_type = self.md['file_type']
