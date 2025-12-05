@@ -14,6 +14,15 @@ import yaml
 import batteryarchive_agent as ba
 
 def add_module_stack_data(engine:Engine, conn:str, modules_to_import:list[ba.AbstractModule]): #for modules and stacks
+    """Adds a list of modules or stacks to the database.
+
+    :param engine: sqlalchemy engine 
+    :type engine: Engine
+    :param conn: database connection string
+    :type conn: str
+    :param modules_to_import: list of module (or stack) objects to import
+    :type modules_to_import: list[ba.AbstractModule]
+    """
     for ind, module in enumerate(modules_to_import):
         id = module.module_id
         file_type_obj = get_file_type_obj(module.tester)
@@ -49,6 +58,19 @@ def add_module_stack_data(engine:Engine, conn:str, modules_to_import:list[ba.Abs
         clear_buffer(id, module.buffer_table, conn, id_type='module_id') 
 
 def add_cell_data(engine:Engine, conn:str, cells_to_import:list[ba.AbstractCell], cell_ts_list=None, parent=None): 
+    """Adds a list of cells to the database.
+
+    :param engine: sqlalchemy engine
+    :type engine: Engine
+    :param conn: database connection string
+    :type conn: str
+    :param cells_to_import: list of cell objects to import
+    :type cells_to_import: list[ba.AbstractCell]
+    :param cell_ts_list: list of timeseries data if coming from a module/stack, defaults to None
+    :type cell_ts_list: list[ba.AbstractCell], optional
+    :param parent: parent object if coming from a module/stack, defaults to None
+    :type parent: ba.AbstractModule, optional
+    """
     logging.info('adding cells')
     for ind, cell in enumerate(cells_to_import):
         id = cell.cell_id
@@ -90,7 +112,16 @@ def add_cell_data(engine:Engine, conn:str, cells_to_import:list[ba.AbstractCell]
         set_status(id, cell.cell_metadata_table, conn, status='completed', id_type='cell_id')
         clear_buffer(id, cell.buffer_table, conn, id_type='cell_id')
 
-def update_cell_data(engine, conn:str, cells_to_import:list[ba.AbstractCell]):
+def update_cell_data(engine:Engine, conn:str, cells_to_import:list[ba.AbstractCell]):
+    """Updates a list of cells by removing old data associated with each cell and adding new data. 
+
+    :param engine: sqlalchemy engine
+    :type engine: Engine
+    :param conn: database connection string
+    :type conn: str
+    :param cells_to_import: list of cell objects to import
+    :type cells_to_import: list[ba.AbstractCell]
+    """
     for cell in cells_to_import:
         id = cell.cell_id
         status = get_status(id, cell.cell_metadata_table, conn, id_type='cell_id')
@@ -115,6 +146,17 @@ def update_cell_data(engine, conn:str, cells_to_import:list[ba.AbstractCell]):
         clear_buffer(id, cell.buffer_table, conn, id_type='cell_id')
 
 def buffer(cell:ba.AbstractCell, file_type_obj:ba.AbstractFileType, cell_ts_list=None) -> pd.DataFrame:
+    """Prepares timeseries data to move to the buffer table in the database for a single cell.
+
+    :param cell: cell object
+    :type cell: ba.AbstractCell
+    :param file_type_obj: file type of timeseries data
+    :type file_type_obj: ba.AbstractFileType
+    :param cell_ts_list: ist of timeseries data if coming from a module/stack, defaults to None
+    :type cell_ts_list: list[ba.AbstractCell], optional
+    :return: dataframe containing all timeseries data for a cell
+    :rtype: pd.DataFrame
+    """
     print('Buffering...')
     # list of timeseries files, excluding hidden files
     all_ts_list = []
@@ -162,6 +204,15 @@ def buffer(cell:ba.AbstractCell, file_type_obj:ba.AbstractFileType, cell_ts_list
     return pd.concat(all_ts_list)
 
 def process_cell(cell:ba.AbstractCell, engine:Engine, conn:str):
+    """Calculates cell statistics and moves cell timeseries data from buffer to timeseries table. Moves stats data to statistics table.
+
+    :param cell: cell object
+    :type cell: ba.AbstractCell
+    :param engine: sqlalchemy engine
+    :type engine: Engine
+    :param conn: database connection string
+    :type conn: str
+    """
     print('Processing...')
     chunk_size = 30 #number of cells to process at once
     cycle_index_max = get_cycle_index_max(conn, cell.buffer_table, cell.cell_id)
@@ -199,6 +250,16 @@ def process_cell(cell:ba.AbstractCell, engine:Engine, conn:str):
                     logging.info("save timeseries time: " + str(time.time() - start_time))
 
 def process_module(module:ba.AbstractModule, engine:Engine, conn:str):
+    """Calculates module/stack statistics and moves module/stack timeseries data from buffer to timeseries table. Moves stats data to statistics table.
+
+
+    :param module: module object
+    :type module: ba.AbstractModule
+    :param engine: sqlalchemy engine
+    :type engine: Engine
+    :param conn: database connection string
+    :type conn: str
+    """
     print('Processing module level...')
     chunk_size = 30 #number of cells to process at once
     cycle_index_max = get_cycle_index_max(conn, module.buffer_table, module.module_id)
@@ -235,7 +296,16 @@ def process_module(module:ba.AbstractModule, engine:Engine, conn:str):
                     print("save timeseries time: " + str(time.time() - start_time))
                     logging.info("save timeseries time: " + str(time.time() - start_time))
 
-def deconstruct(module:ba.AbstractModule, file_type_obj:ba.AbstractFileType) -> list[pd.DataFrame]: #converts module/stack format to cell format
+def deconstruct(module:ba.AbstractModule, file_type_obj:ba.AbstractFileType) -> tuple[list[pd.DataFrame], list[pd.DataFrame]]: 
+    """Separates module/stack data and cell data from a module/stack raw data file. 
+
+    :param module: module object
+    :type module: ba.AbstractModule
+    :param file_type_obj: file type of timeseries data
+    :type file_type_obj: ba.AbstractFileType
+    :return: list of cell timeseries dataframes and list of module timeseries dataframes
+    :rtype: tuple[list[pd.DataFrame], list[pd.DataFrame]]
+    """
     list_ts_fldr = [file for file in pathlib.Path(module.file_path).glob('./*') if not any(part.startswith('.') for part in file.parts)]
     list_cell_ts_all = []
     config_df = pd.read_excel(module.config_path)
@@ -251,8 +321,18 @@ def deconstruct(module:ba.AbstractModule, file_type_obj:ba.AbstractFileType) -> 
             list_cell_ts_all.append((df_cell_ts, '')) #'' in place of sheetnames
     return list_cell_ts_all, module_data
 
-def clear_buffer(id:str, buffer_table:str, conn:str, id_type:str):
-    # this method will delete data for a cell_id. Use with caution as there is no undo
+def clear_buffer(id:str, buffer_table:str, conn:str, id_type='cell_id'): #check cell_id usage
+    """Deletes data for a certain module/stack/cell id from the associated buffer table. Use with caution as there is no undo.
+
+    :param id: module/stack/cell/etc id
+    :type id: str
+    :param buffer_table: buffer table
+    :type buffer_table: str
+    :param conn: database connection string
+    :type conn: str
+    :param id_type: defaults to 'cell_id' 
+    :type id_type: str, optional
+    """
     db_conn = psycopg2.connect(conn)
     curs = db_conn.cursor()
     curs.execute("delete from " + buffer_table + " where " + id_type + "='" + id + "'")
@@ -261,6 +341,19 @@ def clear_buffer(id:str, buffer_table:str, conn:str, id_type:str):
     db_conn.close()
 
 def get_status(id:str, md_table:str, conn:str, id_type:str) -> str:
+    """Get status string from metadata table of given module/stack/cell id.
+
+    :param id: module/stack/cell/etc id
+    :type id: str
+    :param md_table: metadata table
+    :type md_table: str
+    :param conn: database connection string
+    :type conn: str
+    :param id_type: 'module_id', 'stack_id', or 'cell_id' depending on metadata schema
+    :type id_type: str
+    :return: status of module/stack/cell; 'completed', 'new', 'buffering', 'processing'
+    :rtype: str
+    """
     sql_str = "select status from " + md_table + " where " + id_type + "= '" + id + "'"
     db_conn = psycopg2.connect(conn)
     curs = db_conn.cursor()
