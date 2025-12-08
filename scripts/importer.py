@@ -3,7 +3,7 @@
 
 import logging
 import pandas as pd
-#pd.options.mode.chained_assignment = None  # default='warn'
+pd.options.mode.chained_assignment = None  # default='warn'
 import pathlib
 import psycopg2
 import sys, getopt
@@ -13,7 +13,7 @@ import yaml
 
 import batteryarchive_agent as ba
 
-def add_module_stack_data(engine:Engine, conn:str, modules_to_import:list[ba.AbstractModule]): #for modules and stacks
+def add_module_stack_data(engine:Engine, conn:str, modules_to_import:list[ba.AbstractModule]): 
     """Adds a list of modules or stacks to the database.
 
     :param engine: sqlalchemy engine 
@@ -55,7 +55,7 @@ def add_module_stack_data(engine:Engine, conn:str, modules_to_import:list[ba.Abs
             process_module(module, engine, conn)
             status = 'completed'
         set_status(id, module.module_metadata_table, conn, status, id_type='module_id')
-        clear_buffer(id, module.buffer_table, conn, id_type='module_id') 
+        clear_buffer(id, module.buffer_table, conn) 
 
 def add_cell_data(engine:Engine, conn:str, cells_to_import:list[ba.AbstractCell], cell_ts_list=None, parent=None): 
     """Adds a list of cells to the database.
@@ -112,7 +112,7 @@ def add_cell_data(engine:Engine, conn:str, cells_to_import:list[ba.AbstractCell]
         set_status(id, cell.cell_metadata_table, conn, status='completed', id_type='cell_id')
         clear_buffer(id, cell.buffer_table, conn, id_type='cell_id')
 
-def update_cell_data(engine:Engine, conn:str, cells_to_import:list[ba.AbstractCell]):
+def update_cell_data(engine:Engine, conn:str, cells_to_import:list[ba.AbstractCell]):#TODO make versions for module/stack
     """Updates a list of cells by removing old data associated with each cell and adding new data. 
 
     :param engine: sqlalchemy engine
@@ -321,7 +321,7 @@ def deconstruct(module:ba.AbstractModule, file_type_obj:ba.AbstractFileType) -> 
             list_cell_ts_all.append((df_cell_ts, '')) #'' in place of sheetnames
     return list_cell_ts_all, module_data
 
-def clear_buffer(id:str, buffer_table:str, conn:str, id_type='cell_id'): #check cell_id usage
+def clear_buffer(id:str, buffer_table:str, conn:str, id_type='cell_id'):
     """Deletes data for a certain module/stack/cell id from the associated buffer table. Use with caution as there is no undo.
 
     :param id: module/stack/cell/etc id
@@ -368,6 +368,19 @@ def get_status(id:str, md_table:str, conn:str, id_type:str) -> str:
     return status
 
 def set_status(id:str, md_table:str, conn:str, status:str, id_type:str):
+    """Set status string from metadata table of given module/stack/cell id.
+
+    :param id: module/stack/cell/etc id
+    :type id: str
+    :param md_table: metadata table
+    :type md_table: str
+    :param conn: database connection string
+    :type conn: str
+    :param status: status of module/stack/cell to send to database; 'completed', 'new', 'buffering', 'processing'
+    :type status: str
+    :param id_type: 'module_id', 'stack_id', or 'cell_id' depending on metadata schema
+    :type id_type: str
+    """
     sql_str = "update " + md_table + " set status = '" + status + "' where " + id_type + "= '" + id + "'"
     db_conn = psycopg2.connect(conn)
     curs = db_conn.cursor()
@@ -377,7 +390,17 @@ def set_status(id:str, md_table:str, conn:str, status:str, id_type:str):
     db_conn.close()
 
 def get_cycle_index_max(conn:str, table:str, id:str) -> int:
-    #gets max cycle from database
+    """Gets max cycle number from database of given module/stack/cell id.
+
+    :param conn: database connection string
+    :type conn: str
+    :param table: table to query
+    :type table: str
+    :param id: module/stack/cell/etc id
+    :type id: str
+    :return: maximum number of cycles
+    :rtype: int
+    """
     sql_str = "select max(cycle_index)::int as max_cycles from " + table + " where cell_id = '" + id + "'"
     db_conn = psycopg2.connect(conn)
     curs = db_conn.cursor()
@@ -393,7 +416,13 @@ def get_cycle_index_max(conn:str, table:str, id:str) -> int:
     return cycle_index_max
 
 def get_file_type_obj(tester:str) -> ba.AbstractFileType:
-    #make this nicer in future
+    """Gets file type object.
+
+    :param tester: tester specified in metadata
+    :type tester: str
+    :return: file type object
+    :rtype: ba.AbstractFileType
+    """
     if tester == 'arbin':
         return ba.Arbin()
     elif tester == 'matlab':
@@ -405,7 +434,18 @@ def get_file_type_obj(tester:str) -> ba.AbstractFileType:
     elif tester == 'voltaiq':
         return ba.Maccor()
 
-def delete_data(conn:str, tables_to_delete:list[str], cells_to_delete:list[ba.AbstractCell], id_type:str):
+def delete_data(conn:str, tables_to_delete:list[str], cells_to_delete:list, id_type:str):#TODO make versions for module/stack
+    """Deletes data from specified tables and cell ids in database.
+
+    :param conn: database connection string
+    :type conn: str
+    :param tables_to_delete: list of tables to delete from
+    :type tables_to_delete: list[str]
+    :param cells_to_delete: list of cells to delete from database
+    :type cells_to_delete: list
+    :param id_type: 'cell_id' depending on schema
+    :type id_type: str
+    """
     # this method will delete data for a cell_id. Use with caution as there is no undo
     print('Deleting...')
     all_strs = ''
@@ -422,7 +462,6 @@ def delete_data(conn:str, tables_to_delete:list[str], cells_to_delete:list[ba.Ab
     db_conn.close()
 
 def main(argv:list[str]):
-
     # command line variables that can be used to run from an IDE without passing arguments
     mode = 'env'
     path = r'\\'
