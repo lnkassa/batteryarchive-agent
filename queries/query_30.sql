@@ -1,8 +1,9 @@
 /*
-Name: Filters: Min State of Charge
+Name: Filters: PE Volume
 Data source: 1
 Created By: admin
-Last Update At: 2022-03-05T20:49:04.207Z
-Visualizations: [{'id': 34, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2022-02-27T21:57:14.922Z', 'created_at': '2022-02-27T21:57:14.922Z'}]
+Last Update At: 2025-11-05T22:01:40.809Z
+Visualizations: [{'id': 30, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2025-11-05T22:01:34.883Z', 'created_at': '2025-11-05T22:01:34.883Z'}, {'id': 318, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2025-11-05T22:01:40.797Z', 'created_at': '2025-11-05T22:01:40.797Z'}, {'id': 319, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2025-11-05T22:01:40.809Z', 'created_at': '2025-11-05T22:01:40.809Z'}]
 */
-select distinct soc_min as a, count(*) from cycle_metadata group by a order by a
+
+select distinct pe_volume as a, count(*) from flow_cell_metadata group by a order by a

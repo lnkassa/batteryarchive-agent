@@ -1,0 +1,9 @@
+/*
+Name: flowcellefficiency
+Data source: 1
+Created By: admin
+Last Update At: 2025-11-05T22:01:37.935Z
+Visualizations: [{'id': 60, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2025-11-05T22:01:35.511Z', 'created_at': '2025-11-05T22:01:35.511Z'}, {'id': 195, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2025-11-05T22:01:37.911Z', 'created_at': '2025-11-05T22:01:37.911Z'}, {'id': 196, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2025-11-05T22:01:37.923Z', 'created_at': '2025-11-05T22:01:37.923Z'}, {'id': 197, 'type': 'CHART', 'name': '', 'description': '', 'options': {'globalSeriesType': 'line', 'sortX': True, 'legend': {'enabled': True, 'placement': 'auto', 'traceorder': 'normal'}, 'xAxis': {'type': '-', 'labels': {'enabled': True}, 'title': {'text': 'Cycle Index'}}, 'yAxis': [{'type': 'linear', 'title': {'text': 'Energy and Coulombic Efficiency'}}, {'type': 'linear', 'opposite': True}], 'alignYAxesAtZero': False, 'error_y': {'type': 'data', 'visible': True}, 'series': {'stacking': None, 'error_y': {'type': 'data', 'visible': True}}, 'seriesOptions': {}, 'valuesOptions': {}, 'columnMapping': {'cycle_index': 'x', 'ah_eff': 'y', 'e_eff': 'y'}, 'direction': {'type': 'counterclockwise'}, 'sizemode': 'diameter', 'coefficient': 1, 'numberFormat': '0,0[.]00000', 'percentFormat': '0[.]00%', 'textFormat': '', 'missingValuesAsZero': True, 'showDataLabels': False, 'dateTimeFormat': 'DD/MM/YY HH:mm', 'swappedAxes': False}, 'updated_at': '2025-11-05T22:01:37.935Z', 'created_at': '2025-11-05T22:01:37.935Z'}]
+*/
+
+select * from flow_cycle_stats where cell_id IN ({{cell_id}})

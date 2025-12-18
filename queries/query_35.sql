@@ -1,8 +1,14 @@
 /*
-Name: Filters: Anode
+Name: Validate cycle test time series
 Data source: 1
 Created By: admin
-Last Update At: 2022-03-05T20:37:48.166Z
-Visualizations: [{'id': 39, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2022-02-27T21:57:16.107Z', 'created_at': '2022-02-27T21:57:16.107Z'}]
+Last Update At: 2025-11-05T22:01:36.314Z
+Visualizations: [{'id': 35, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2025-11-05T22:01:34.988Z', 'created_at': '2025-11-05T22:01:34.988Z'}, {'id': 92, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2025-11-05T22:01:36.264Z', 'created_at': '2025-11-05T22:01:36.264Z'}, {'id': 93, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2025-11-05T22:01:36.276Z', 'created_at': '2025-11-05T22:01:36.276Z'}, {'id': 94, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2025-11-05T22:01:36.289Z', 'created_at': '2025-11-05T22:01:36.289Z'}, {'id': 95, 'type': 'CHART', 'name': 'Chart', 'description': '', 'options': {'globalSeriesType': 'scatter', 'sortX': True, 'legend': {'enabled': True, 'placement': 'auto', 'traceorder': 'normal'}, 'xAxis': {'type': '-', 'labels': {'enabled': True}}, 'yAxis': [{'type': 'linear'}, {'type': 'linear', 'opposite': True}], 'alignYAxesAtZero': False, 'error_y': {'type': 'data', 'visible': True}, 'series': {'stacking': None, 'error_y': {'type': 'data', 'visible': True}}, 'seriesOptions': {'UL-PUR_CF10OV1C-2_pouch_NCA_25C_0-100_1/1C_h 10.0': {'yAxis': 0, 'type': 'scatter'}, 'i': {'yAxis': 0, 'type': 'scatter'}}, 'valuesOptions': {}, 'columnMapping': {'test_time': 'x', 'v': 'y', 'i': 'y'}, 'direction': {'type': 'counterclockwise'}, 'sizemode': 'diameter', 'coefficient': 1, 'numberFormat': '0,0[.]00000', 'percentFormat': '0[.]00%', 'textFormat': '', 'missingValuesAsZero': True, 'showDataLabels': False, 'dateTimeFormat': 'DD/MM/YY HH:mm', 'swappedAxes': False}, 'updated_at': '2025-11-05T22:01:36.301Z', 'created_at': '2025-11-05T22:01:36.301Z'}, {'id': 96, 'type': 'CHART', 'name': 'Chart', 'description': '', 'options': {'globalSeriesType': 'scatter', 'sortX': True, 'legend': {'enabled': True, 'placement': 'auto', 'traceorder': 'normal'}, 'xAxis': {'type': '-', 'labels': {'enabled': True}}, 'yAxis': [{'type': 'linear'}, {'type': 'linear', 'opposite': True}], 'alignYAxesAtZero': False, 'error_y': {'type': 'data', 'visible': True}, 'series': {'stacking': None, 'error_y': {'type': 'data', 'visible': True}}, 'seriesOptions': {'v': {'yAxis': 1, 'type': 'scatter'}, 'i': {'yAxis': 1, 'type': 'scatter'}}, 'valuesOptions': {}, 'columnMapping': {'test_time': 'x', 'ah_c': 'y', 'ah_d': 'y', 'i': 'y'}, 'direction': {'type': 'counterclockwise'}, 'sizemode': 'diameter', 'coefficient': 1, 'numberFormat': '0,0[.]00000', 'percentFormat': '0[.]00%', 'textFormat': '', 'missingValuesAsZero': True, 'showDataLabels': False, 'dateTimeFormat': 'DD/MM/YY HH:mm', 'swappedAxes': False}, 'updated_at': '2025-11-05T22:01:36.314Z', 'created_at': '2025-11-05T22:01:36.314Z'}]
 */
-select distinct anode as a, count(*) from cell_metadata group by a order by a
+
+SELECT t.*
+FROM (
+  SELECT cell_id, cycle_index, test_time, cycle_time, ah_d, e_d, ah_c, e_c, v, i, cell_id  || ' ' || cycle_index as label, row_number() OVER(ORDER BY cell_id, test_time ASC) AS row
+  FROM cycle_timeseries where cell_id IN ({{cell_id}}) and (cycle_index = {{Step_1}}) 
+) t
+WHERE t.row % (select step from cycle_metadata where cell_id = t.cell_id) = 0  

@@ -1,8 +1,9 @@
 /*
-Name: Filters: Indentor
+Name: Filters: Source abuse test
 Data source: 1
 Created By: admin
-Last Update At: 2022-03-12T16:40:36.205Z
-Visualizations: [{'id': 42, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2022-03-12T16:39:53.887Z', 'created_at': '2022-03-12T16:39:53.887Z'}]
+Last Update At: 2025-11-05T22:01:36.363Z
+Visualizations: [{'id': 36, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2025-11-05T22:01:35.009Z', 'created_at': '2025-11-05T22:01:35.009Z'}, {'id': 97, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2025-11-05T22:01:36.325Z', 'created_at': '2025-11-05T22:01:36.325Z'}, {'id': 98, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2025-11-05T22:01:36.337Z', 'created_at': '2025-11-05T22:01:36.337Z'}, {'id': 99, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2025-11-05T22:01:36.351Z', 'created_at': '2025-11-05T22:01:36.351Z'}, {'id': 100, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2025-11-05T22:01:36.363Z', 'created_at': '2025-11-05T22:01:36.363Z'}]
 */
-select distinct indentor as a, count(*) from abuse_metadata group by a order by a
+
+select distinct source as a, count(*) from cell_metadata where test = 'abuse' group by a order by a 

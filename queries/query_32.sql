@@ -1,29 +1,20 @@
 /*
-Name: Cycle Quantities by step
+Name: Max and Min Voltage by Cycle
 Data source: 1
 Created By: admin
-Last Update At: 2022-03-12T18:17:49.403Z
-Visualizations: [{'id': 36, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2022-03-12T18:40:44.834Z', 'created_at': '2022-02-27T21:57:15.391Z'}, {'id': 47, 'type': 'CHART', 'name': 'Chart', 'description': '', 'options': {'globalSeriesType': 'line', 'sortX': True, 'legend': {'enabled': True, 'placement': 'auto', 'traceorder': 'normal'}, 'xAxis': {'type': '-', 'labels': {'enabled': True}, 'title': {'text': 'Cycle Time (s)'}}, 'yAxis': [{'type': 'linear', 'title': {'text': 'Voltage (V)'}}, {'type': 'linear', 'opposite': True}], 'alignYAxesAtZero': False, 'error_y': {'type': 'data', 'visible': True}, 'series': {'stacking': None, 'error_y': {'type': 'data', 'visible': True}}, 'seriesOptions': {}, 'valuesOptions': {}, 'columnMapping': {'cycle_time': 'x', 'v': 'y', 'series': 'series'}, 'direction': {'type': 'counterclockwise'}, 'sizemode': 'diameter', 'coefficient': 1, 'numberFormat': '0,0[.]00000', 'percentFormat': '0[.]00%', 'textFormat': '', 'missingValuesAsZero': True, 'showDataLabels': False, 'dateTimeFormat': 'DD/MM/YY HH:mm', 'swappedAxes': False}, 'updated_at': '2022-03-12T18:41:03.321Z', 'created_at': '2022-03-12T18:15:43.509Z'}]
+Last Update At: 2025-11-05T22:01:36.063Z
+Visualizations: [{'id': 32, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2025-11-05T22:01:34.927Z', 'created_at': '2025-11-05T22:01:34.927Z'}, {'id': 76, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2025-11-05T22:01:35.877Z', 'created_at': '2025-11-05T22:01:35.877Z'}, {'id': 77, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2025-11-05T22:01:35.890Z', 'created_at': '2025-11-05T22:01:35.890Z'}, {'id': 78, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2025-11-05T22:01:35.901Z', 'created_at': '2025-11-05T22:01:35.901Z'}, {'id': 79, 'type': 'CHART', 'name': 'Time Series Data', 'description': '', 'options': {'globalSeriesType': 'scatter', 'sortX': True, 'legend': {'enabled': True, 'placement': 'auto', 'traceorder': 'normal'}, 'xAxis': {'type': '-', 'labels': {'enabled': True}, 'title': {'text': 'Time (s)'}}, 'yAxis': [{'type': 'linear', 'title': {'text': 'Wh/Ah'}}, {'type': 'linear', 'opposite': True}], 'alignYAxesAtZero': False, 'error_y': {'type': 'data', 'visible': True}, 'series': {'stacking': None, 'error_y': {'type': 'data', 'visible': True}}, 'seriesOptions': {}, 'valuesOptions': {}, 'columnMapping': {'test_time': 'x', 'value': 'y', 'series': 'series'}, 'direction': {'type': 'counterclockwise'}, 'sizemode': 'diameter', 'coefficient': 1, 'numberFormat': '0,0[.]00000', 'percentFormat': '0[.]00%', 'textFormat': '', 'missingValuesAsZero': True, 'showDataLabels': False, 'dateTimeFormat': 'DD/MM/YY HH:mm', 'swappedAxes': False}, 'updated_at': '2025-11-05T22:01:36.036Z', 'created_at': '2025-11-05T22:01:36.036Z'}, {'id': 80, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2025-11-05T22:01:41.107Z', 'created_at': '2025-11-05T22:01:36.050Z'}, {'id': 81, 'type': 'CHART', 'name': 'Cycle Index Data', 'description': '', 'options': {'globalSeriesType': 'line', 'sortX': True, 'legend': {'enabled': True, 'placement': 'auto', 'traceorder': 'normal'}, 'xAxis': {'type': '-', 'labels': {'enabled': True}, 'title': {'text': 'Cycle Index'}}, 'yAxis': [{'type': 'linear', 'title': {'text': 'Ah/Wh'}}, {'type': 'linear', 'opposite': True}], 'alignYAxesAtZero': False, 'error_y': {'type': 'data', 'visible': True}, 'series': {'stacking': None, 'error_y': {'type': 'data', 'visible': True}}, 'seriesOptions': {}, 'valuesOptions': {}, 'columnMapping': {'cycle_index': 'x', 'value': 'y', 'series': 'series'}, 'direction': {'type': 'counterclockwise'}, 'sizemode': 'diameter', 'coefficient': 1, 'numberFormat': '0,0[.]00000', 'percentFormat': '0[.]00%', 'textFormat': '', 'missingValuesAsZero': True, 'showDataLabels': False, 'dateTimeFormat': 'DD/MM/YY HH:mm', 'swappedAxes': False}, 'updated_at': '2025-11-05T22:01:41.348Z', 'created_at': '2025-11-05T22:01:36.063Z'}]
 */
-select * from 
-(SELECT
-	cycle_time,
-	v,  
-	cycle_index,  
-	case 
-	    when i>0 then
-	        ah_c  
-	    when i<0 then
-	        ah_d
-	    end ah,
-	case 
-	    when i>0 then
-	        cell_id || ' c: ' || cycle_index  
-	    when i<0 then
-	        cell_id || ' d: ' || cycle_index
-	    end series
-FROM cycle_timeseries
-where 
-    cell_id IN ({{cell_id}}) and 
-    MOD(cycle_index,{{step}})=0 
-order by cycle_index, series) as foo where series is not null     
+
+SELECT
+   key || ': ' || r.cell_id as series,
+   r.cycle_index,
+   r.test_time,
+   value
+FROM (SELECT cell_id, trunc(cycle_index,0) as cycle_index, test_time, json_build_object('v_max', v_max, 'v_min', v_min, 'v_c_mean', v_c_mean, 'v_d_mean', v_d_mean ) AS line 
+FROM cycle_stats
+where cell_id IN ({{cell_id}}) and ah_eff<1.1) as r
+JOIN LATERAL json_each_text(r.line) ON (key ~ '[v,v_c,v_d]_[max,min,mean]')
+where cast(value as numeric)!=0
+GROUP by r.cell_id, r.cycle_index,  r.test_time, json_each_text.key, json_each_text.value      
+order by r.cell_id,r.cycle_index, key    

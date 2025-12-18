@@ -1,0 +1,9 @@
+/*
+Name: stackStats
+Data source: 1
+Created By: admin
+Last Update At: 2025-11-05T22:01:39.316Z
+Visualizations: [{'id': 72, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2025-11-05T22:01:35.770Z', 'created_at': '2025-11-05T22:01:35.770Z'}, {'id': 236, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2025-11-05T22:01:39.280Z', 'created_at': '2025-11-05T22:01:39.280Z'}, {'id': 237, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2025-11-05T22:01:39.298Z', 'created_at': '2025-11-05T22:01:39.298Z'}, {'id': 238, 'type': 'CHART', 'name': 'Accumulative Charge and Discharge Energy', 'description': '', 'options': {'globalSeriesType': 'line', 'sortX': True, 'legend': {'enabled': True, 'placement': 'auto', 'traceorder': 'normal'}, 'xAxis': {'type': '-', 'labels': {'enabled': True}, 'title': {'text': 'Cycle Index'}}, 'yAxis': [{'type': 'linear', 'title': {'text': 'Accumulative Energy (Wh)'}}, {'type': 'linear', 'opposite': True}], 'alignYAxesAtZero': False, 'error_y': {'type': 'data', 'visible': True}, 'series': {'stacking': None, 'error_y': {'type': 'data', 'visible': True}}, 'seriesOptions': {}, 'valuesOptions': {}, 'columnMapping': {'cycle_index': 'x', 'e_c_cmltv': 'y', 'e_d_cmltv': 'y', 'e_eff_cmltv': 'y'}, 'direction': {'type': 'counterclockwise'}, 'sizemode': 'diameter', 'coefficient': 1, 'numberFormat': '0,0[.]00000', 'percentFormat': '0[.]00%', 'textFormat': '', 'missingValuesAsZero': True, 'showDataLabels': False, 'dateTimeFormat': 'DD/MM/YY HH:mm', 'swappedAxes': False}, 'updated_at': '2025-11-05T22:01:41.805Z', 'created_at': '2025-11-05T22:01:39.316Z'}]
+*/
+
+select * from flow_cycle_stats where cell_id in ({{stack_id}})

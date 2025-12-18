@@ -1,0 +1,9 @@
+/*
+Name: stackPVTp
+Data source: 1
+Created By: admin
+Last Update At: 2025-11-05T22:01:39.122Z
+Visualizations: [{'id': 70, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2025-11-05T22:01:35.727Z', 'created_at': '2025-11-05T22:01:35.727Z'}, {'id': 230, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2025-11-05T22:01:39.090Z', 'created_at': '2025-11-05T22:01:39.090Z'}, {'id': 231, 'type': 'TABLE', 'name': 'Table', 'description': '', 'options': {}, 'updated_at': '2025-11-05T22:01:39.106Z', 'created_at': '2025-11-05T22:01:39.106Z'}, {'id': 232, 'type': 'CHART', 'name': 'Power, Voltage, Temperature, and Pressure', 'description': '', 'options': {'globalSeriesType': 'line', 'sortX': True, 'legend': {'enabled': True, 'placement': 'auto', 'traceorder': 'normal'}, 'xAxis': {'type': '-', 'labels': {'enabled': True}, 'title': {'text': 'Time (s)'}}, 'yAxis': [{'type': 'linear'}, {'type': 'linear', 'opposite': True}], 'alignYAxesAtZero': False, 'error_y': {'type': 'data', 'visible': True}, 'series': {'stacking': None, 'error_y': {'type': 'data', 'visible': True}}, 'seriesOptions': {}, 'valuesOptions': {}, 'columnMapping': {'test_time': 'x', 'v': 'y', 'cell_temperature': 'y', 'w': 'y'}, 'direction': {'type': 'counterclockwise'}, 'sizemode': 'diameter', 'coefficient': 1, 'numberFormat': '0,0[.]00000', 'percentFormat': '0[.]00%', 'textFormat': '', 'missingValuesAsZero': True, 'showDataLabels': False, 'dateTimeFormat': 'DD/MM/YY HH:mm', 'swappedAxes': False}, 'updated_at': '2025-11-05T22:01:41.773Z', 'created_at': '2025-11-05T22:01:39.122Z'}]
+*/
+
+select * from flow_cycle_timeseries where cell_id IN ({{stack_id}})
