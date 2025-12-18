@@ -1,15 +1,22 @@
 # coding: utf-8
 # Copyright 2025 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this software.
 
+
+#cell level plot only subset of data 
+#voltage module level and current
+#select multiple cells
+
 import logging
 import pandas as pd
 pd.options.mode.chained_assignment = None  # default='warn'
 import pathlib
-import psycopg2
-import sys, getopt
-from sqlalchemy import create_engine, text, Engine
+from sqlalchemy import text, create_engine, Engine
 import time
 import yaml
+import click
+import sys
+import getopt
+import psycopg2
 
 import batteryarchive_agent as ba
 
@@ -309,9 +316,9 @@ def deconstruct(module:ba.AbstractModule, file_type_obj:ba.AbstractFileType) -> 
     list_ts_fldr = [file for file in pathlib.Path(module.file_path).glob('./*') if not any(part.startswith('.') for part in file.parts)]
     list_cell_ts_all = []
     config_df = pd.read_excel(module.config_path)
-    for file_path in list_ts_fldr: #this is not ideal, loop through folder to find data path
+    for file_path in list_ts_fldr: 
         if file_path != module.config_path:
-            data_path = file_path
+            data_path = file_path #only works if there is a single data file
     df_module_ts, sheetname = file_type_obj.file_to_df(data_path)
     for index, row in config_df.iterrows():
         if row['Type'] == 'Module':
@@ -460,6 +467,59 @@ def delete_data(conn:str, tables_to_delete:list[str], cells_to_delete:list, id_t
     db_conn.commit()
     curs.close()
     db_conn.close()
+
+# @click.command()
+# @click.option('--import_type','-i')
+# @click.argument('path')
+# @click.argument('data_type')
+# def main(import_type, data_type, path):
+#     # initializing the logger
+#     logging.basicConfig(format='%(asctime)s %(message)s', filename='blc-python.log', level=logging.DEBUG)
+#     logging.info('starting')
+
+#     # read database connection
+#     conn = ''
+#     try:
+#         env = yaml.safe_load(open('../env'))
+#         x = env.split(" ")
+#         for i in x:
+#             j = i.split("=")
+#             if j[0] == 'LOCAL_CONNECTION':
+#                 conn =  j[1]
+#     except:
+#         click.echo("Error opening env file")
+    
+#     # read configuration values
+#     data = yaml.safe_load(open('battery-blc-library.yaml'))
+
+#     # use default if env file not there
+#     if conn == '':
+#         conn = data['environment']['DATABASE_CONNECTION']
+    
+#     logging.info('commands: ' + data_type + ' ' + path)
+#     logging.info('configuration: ' + str(data))
+
+#     engine = create_engine(conn)
+
+#     if data_type == 'li-cell':
+#         md = pd.read_excel(pathlib.PurePath(path).joinpath("cell_list.xlsx"))
+#         cells_to_import = [ba.LithiumCell(path,row) for ind, row in md.iterrows()]
+#         if import_type == None:
+#             click.echo('Defaulting to adding data...')
+#             add_cell_data(engine, conn, cells_to_import)
+#         elif import_type == 'update':
+#             update_cell_data(engine, conn, cells_to_import)
+#     elif data_type == 'flow-cell':
+#         md = pd.read_excel(pathlib.PurePath(path).joinpath("cell_list.xlsx"))
+#         cells_to_import = [ba.FlowCell(path, row) for ind, row in md.iterrows()]
+#         add_cell_data(engine, conn, cells_to_import)
+#     elif data_type == 'li-module':
+#         md = pd.read_excel(pathlib.PurePath(path).joinpath("module_list.xlsx"))
+#         modules_to_import = [ba.LithiumModule(path, row) for ind, row in md.iterrows()]
+#         add_module_stack_data(engine, conn, modules_to_import)
+
+# if __name__ == "__main__":
+#     main()
 
 def main(argv:list[str]):
     # command line variables that can be used to run from an IDE without passing arguments
