@@ -1,11 +1,6 @@
 # coding: utf-8
 # Copyright 2025 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this software.
 
-
-#cell level plot only subset of data 
-#voltage module level and current
-#select multiple cells
-
 import logging
 import pandas as pd
 pd.options.mode.chained_assignment = None  # default='warn'
